@@ -87,6 +87,9 @@ def decide_next(state: ReturnState) -> str:
 def orchestrator_node(state: ReturnState) -> dict[str, Any]:
     nxt = decide_next(state)
     out: dict[str, Any] = {"next_agent": nxt, "handoffs": ["orchestrator"], "events": [f"orchestrator -> {nxt}"]}
+    if nxt == "computation":
+        # the orchestrator numbers the attempts; Computation itself does no arithmetic, not even a counter
+        out["computation_version"] = int(state.get("computation_version", 0)) + 1
     status_for = {"intake": "intake", "extraction": "extracting", "eligibility": "eligibility", "computation": "computing", "review": "review", "escalation": "waiting_human"}
     if nxt in status_for:
         out["status"] = status_for[nxt]

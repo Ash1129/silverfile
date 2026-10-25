@@ -1,0 +1,189 @@
+{
+  "_schema": {
+    "id": "short unique name",
+    "title": "what the case is",
+    "purpose": "what it proves about the system",
+    "intake": "path to a confirmed intake.json (relative to the repo root) or an inline dict; skips the conversation",
+    "intake_patch": "optional dict merged over the intake (taxpayer / spouse merged one level deep)",
+    "answers": "alternative to intake: the taxpayer's answers, fed one per question interrupt; the upload interrupt consumes one answer and attaches the documents",
+    "documents": "[{id, kind, path}] with paths relative to the repo root",
+    "fault_injection": "optional test hook passed to new_return_state",
+    "resolution": "optional {escalation kind: {action, note, facts_patch}}; an escalation with no entry stops the run there",
+    "expected": {"status": "final status", "escalations": "kinds raised, in order of first appearance", "lines": "exact values for a few lines", "flags": "optional top-level state values"}
+  },
+  "cases": [
+    {
+      "id": "clean_single",
+      "title": "Clean single return (case1): W-2 image, SSA-1099, 1099-R, 1099-INT",
+      "purpose": "The happy path: four documents extracted in parallel, one review round, every number traceable to a tax_math call.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
+      ],
+      "expected": {
+        "status": "complete",
+        "escalations": [],
+        "lines": {"1z": 18400.0, "2b": 842.17, "5b": 14200.0, "6a": 21600.0, "6b": 13205.84, "11a": 46648.01, "12e": 17750.0, "13b": 6000.0, "15": 22898.01, "16": 2509.26, "33": 2610.0, "34": 100.74, "37": 0.0},
+        "flags": {"review_round": 1, "computation_version": 1}
+      }
+    },
+    {
+      "id": "spouse_died_mfj",
+      "title": "Spouse died during the year (case2): filing status decided by a person, then MFJ",
+      "purpose": "The HITL path: eligibility escalates filing_status, a Kushim employee answers MFJ through facts_patch, eligibility re-runs and the draft completes with three 12d boxes.",
+      "intake": "data/fixtures/case2_hitl/intake.json",
+      "documents": [
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case2_hitl/ssa1099.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case2_hitl/1099r.json"},
+        {"id": "div-1", "kind": "1099-DIV", "path": "data/fixtures/case2_hitl/1099div.json"}
+      ],
+      "resolution": {"filing_status": {"action": "continue", "note": "MFJ for the year of death", "facts_patch": {"filing_status": "mfj"}}},
+      "expected": {
+        "status": "complete",
+        "escalations": ["filing_status"],
+        "lines": {"12e": 36300.0, "13b": 12000.0, "6b": 7462.47, "15": 0.0, "16": 0.0, "34": 4000.0},
+        "flags": {"eligibility.box_count": 3, "eligibility.filing_status": "mfj"}
+      }
+    },
+    {
+      "id": "out_of_scope_nec",
+      "title": "1099-NEC uploaded (case3): self-employment income is out of scope",
+      "purpose": "Scope enforcement: extraction records the document, eligibility escalates out_of_scope before any arithmetic, and a halt hands the return to a preparer.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "intake_patch": {"taxpayer": {"first_name": "Ruth", "last_name": "Adler"}, "documents_declared": ["SSA-1099"]},
+      "documents": [
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case3_out_of_scope/ssa1099.json"},
+        {"id": "nec-1", "kind": "1099-NEC", "path": "data/fixtures/case3_out_of_scope/1099nec.json"}
+      ],
+      "resolution": {"out_of_scope": {"action": "halt", "note": "Schedule C: a preparer takes it from here"}},
+      "expected": {"status": "halted", "escalations": ["out_of_scope"], "lines": {}, "flags": {"eligibility.in_scope": false}}
+    },
+    {
+      "id": "r_box2b",
+      "title": "1099-R with box 2b checked (case4): taxable amount not determined",
+      "purpose": "The Simplified Method / General Rule is out of scope: eligibility escalates r_box2b and computation never calls taxable_1099r on it.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "intake_patch": {"taxpayer": {"first_name": "Samuel", "last_name": "Ortega"}, "documents_declared": ["1099-R"]},
+      "documents": [{"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case4_r_box2b/1099r.json"}],
+      "resolution": {"r_box2b": {"action": "halt", "note": "preparer to work the taxable amount"}},
+      "expected": {"status": "halted", "escalations": ["r_box2b"], "lines": {}}
+    },
+    {
+      "id": "advice_request",
+      "title": "Taxpayer asks for advice mid-intake (should I convert my IRA to a Roth?)",
+      "purpose": "Intake notes the question, declines to advise, escalates it, and after a person acknowledges it the same question is asked again and the return completes normally.",
+      "answers": [
+        "Yes, it's my return",
+        "Eleanor Whitfield",
+        "912-34-5678",
+        "March 14, 1954",
+        "No",
+        "Single",
+        "Single",
+        "None",
+        "No",
+        "I have a W-2 from the library, my SSA-1099, a 1099-R from my pension, and a 1099-INT from the bank",
+        "No",
+        "Should I convert my IRA to a Roth?",
+        "500",
+        "None",
+        "None",
+        "None",
+        "None",
+        "My checking account at Finger Lakes Savings",
+        "Yes",
+        "done",
+        "Yes"
+      ],
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
+      ],
+      "resolution": {"advice": {"action": "continue", "note": "preparer will discuss the Roth question"}},
+      "expected": {
+        "status": "complete",
+        "escalations": ["advice"],
+        "lines": {"1z": 18400.0, "6b": 13205.84, "16": 2509.26, "34": 100.74},
+        "flags": {"intake.noted_questions": ["Should I convert my IRA to a Roth?"], "intake.estimated_payments": 500.0}
+      }
+    },
+    {
+      "id": "third_party_no_authority",
+      "title": "A third party answers without stated authority",
+      "purpose": "Exploitation signal: eligibility raises an exploitation escalation and the return waits for a person; no draft is computed.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "intake_patch": {"answering_party": "third_party_no_authority", "third_party_authority": "I'm her nephew, she asked me to do it"},
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
+      ],
+      "expected": {"status": "waiting_human", "escalations": ["exploitation"], "lines": {}}
+    },
+    {
+      "id": "refund_account_not_own",
+      "title": "Refund account the taxpayer does not describe as their own",
+      "purpose": "Exploitation signal: the refund destination is questioned before any money line exists.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "intake_patch": {"refund_account_is_own": false, "refund_account_description": "the account my nephew set up for me"},
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
+      ],
+      "expected": {"status": "waiting_human", "escalations": ["exploitation"], "lines": {}}
+    },
+    {
+      "id": "declared_document_missing",
+      "title": "Taxpayer declared a 1099-R but none was uploaded",
+      "purpose": "Statement/document conflict: eligibility raises a conflict escalation rather than silently filing lines 5a/5b as zero.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"}
+      ],
+      "expected": {"status": "waiting_human", "escalations": ["conflict"], "lines": {}}
+    },
+    {
+      "id": "two_w2s",
+      "title": "Two W-2 images plus the case1 documents",
+      "purpose": "Several documents of the same kind are summed on 1z and 25a through tax_math.sum_amounts, each with its own extraction branch.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "w2-2", "kind": "W-2", "path": "demo/w2_image_2.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
+      ],
+      "expected": {
+        "status": "complete",
+        "escalations": [],
+        "lines": {"1z": 24650.0, "25a": 1520.0, "6b": 18360.0, "15": 34302.17, "16": 3877.76, "34": 0.0, "37": 957.76}
+      }
+    },
+    {
+      "id": "loop_guard",
+      "title": "Agents bounce the return between eligibility and computation",
+      "purpose": "The orchestrator's loop guard: the eligibility->computation pattern repeated three times is stopped, escalated as loop_guard, and a halt ends the return.",
+      "intake": "data/fixtures/case1_clean/intake.json",
+      "documents": [
+        {"id": "w2-1", "kind": "W-2", "path": "demo/w2_image_1.jpg"},
+        {"id": "ssa-1", "kind": "SSA-1099", "path": "data/fixtures/case1_clean/ssa1099.json"},
+        {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
+        {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
+      ],
+      "fault_injection": {"ping_pong": true},
+      "resolution": {"loop_guard": {"action": "halt", "note": "stopped by a person"}},
+      "expected": {"status": "halted", "escalations": ["loop_guard"], "lines": {}, "flags": {"loop_guard_tripped": true}}
+    }
+  ]
+}

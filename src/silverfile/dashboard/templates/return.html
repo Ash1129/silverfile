@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ rid }} — {{ row.taxpayer_name or "return" }}{% endblock %}
+{% block head %}{% if auto_refresh %}<script>setTimeout(function () { location.reload(); }, 2000);</script>{% endif %}{% endblock %}
+{% block content %}
+<section class="card head">
+  <div>
+    <h1><code>{{ rid }}</code> {{ row.taxpayer_name or "" }}</h1>
+    <p class="muted">{{ summary }}</p>
+  </div>
+  <div class="head-right">
+    <span class="status status-{{ state.status }}">{{ status_text }}</span>
+    {% if pending and pending.type in ("question", "upload") %}<span class="badge">Waiting on taxpayer</span>{% endif %}
+    <div class="links">
+      <a class="button" href="/returns/{{ rid }}/form">Draft form</a>
+      <a class="button" href="/returns/{{ rid }}/form.pdf">PDF</a>
+      <a class="button" href="/returns/{{ rid }}/state.json">state.json</a>
+      {% if auto_refresh %}<form method="post" action="/returns/{{ rid }}/run" style="display:inline"><button class="button" type="submit">Advance</button></form>{% endif %}
+    </div>
+    <div class="muted small">created {{ state.created_at | when }} · updated {{ row.updated_at | when }}{% if fixture %} · from {{ fixture }}{% endif %}</div>
+  </div>
+</section>
+
+<div class="two-col">
+  <!-- ---------------------------------------------------------- chat -->
+  <section class="card chat">
+    <h2>Conversation with the taxpayer</h2>
+    <div class="transcript">
+      {% if not transcript %}<p class="muted">{% if state.intake_complete %}The intake was prefilled; there was no conversation.{% else %}Nothing said yet.{% endif %}</p>{% endif %}
+      {% for m in transcript %}
+      <div class="msg {{ m.role }}"><span class="who">{{ "SilverFile" if m.role == "assistant" else "Taxpayer" }}</span><p>{{ m.text }}</p></div>
+      {% endfor %}
+      {% if pending and pending.type in ("question", "upload") %}
+      <div class="msg assistant pending"><span class="who">SilverFile asks</span><p>{{ pending.text }}</p></div>
+      {% endif %}
+    </div>
+
+    {% if pending and pending.type == "question" %}
+    <form method="post" action="/returns/{{ rid }}/answer" class="stack answer">
+      <label>Your answer <span class="muted small">(slot: {{ pending.slot }})</span>
+        <input type="text" name="text" autofocus autocomplete="off" required>
+      </label>
+      <button type="submit" class="button primary">Send</button>
+    </form>
+    {% elif pending and pending.type == "upload" %}
+    <form method="post" action="/returns/{{ rid }}/upload" enctype="multipart/form-data" class="stack answer">
+      {% if documents_in %}
+      <p class="small">Already attached to this return: {% for d in documents_in %}<span class="kind">{{ d.id }} · {{ d.kind }}</span> {% endfor %}</p>
+      {% endif %}
+      <label>Upload more documents (images or .json payloads)
+        <input type="file" name="files" multiple accept=".jpg,.jpeg,.png,.webp,.json">
+      </label>
+      <label>Message <input type="text" name="text" value="done" autocomplete="off"></label>
+      <div class="row">
+        <button type="submit" class="button primary">Upload and continue</button>
+        {% if fixture %}<button type="submit" class="button" name="use_fixture" value="1">Use attached fixture documents ({{ fixture }}) and continue</button>{% endif %}
+      </div>
+    </form>
+    {% elif state.status == "complete" %}
+    <p class="done">Draft complete. <a href="/returns/{{ rid }}/form">Open the draft form</a> or the <a href="/returns/{{ rid }}/form.pdf">PDF</a>.</p>
+    {% elif state.status == "halted" %}
+    <p class="halt">Halted: {{ state.halted_reason or "a Kushim preparer takes it from here." }}</p>
+    {% endif %}
+  </section>
+
+  <!-- ---------------------------------------------------------- escalation / trace -->
+  <div class="stack">
+    {% if escalation %}
+    <section class="card escalation">
+      <h2>Needs a person <span class="badge alert">{{ escalation.kind }}</span></h2>
+      <p class="reason">{{ escalation.reason | mask }}</p>
+      <p class="muted small">Raised by {{ escalation.raised_by }} at {{ escalation.raised_at | when }}{% if pending and pending.open_count and pending.open_count > 1 %} · {{ pending.open_count }} open in total{% endif %}</p>
+      {% if escalation.details %}<details><summary>Details</summary><pre>{{ escalation.details | pretty | mask }}</pre></details>{% endif %}
+      {% if pending and pending.type == "escalation" %}
+      <form method="post" action="/returns/{{ rid }}/resolve" class="stack">
+        <label>Resolved by <input type="text" name="resolved_by" placeholder="your name" required></label>
+        <label>Note <textarea name="note" rows="2" placeholder="what was decided and why"></textarea></label>
+        <fieldset>
+          <legend>Action</legend>
+          <label class="check"><input type="radio" name="action" value="continue" checked> Continue — the return goes on (with any corrected facts below)</label>
+          <label class="check"><input type="radio" name="action" value="halt"> Halt — a Kushim preparer takes the return over</label>
+          <label class="check"><input type="radio" name="action" value="accept"> Accept — keep the draft with the findings noted (review_unresolved only)</label>
+        </fieldset>
+        <label>Decide the filing status
+          <select name="filing_status">{% for v, l in filing_statuses %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+        </label>
+        <label>Other facts to correct (JSON object, optional)
+          <textarea name="facts_patch" rows="3" placeholder='{"estimated_payments": 500}'></textarea>
+        </label>
+        <button type="submit" class="button primary">Resolve</button>
+      </form>
+      {% else %}
+      <p class="muted">The graph has not reached this escalation yet. <form method="post" action="/returns/{{ rid }}/run" style="display:inline"><button class="button" type="submit">Advance</button></form></p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% set resolved = state.escalations | selectattr("status", "equalto", "resolved") | list %}
+    {% if resolved %}
+    <section class="card">
+      <h2>Resolved escalations</h2>
+      <ul class="plain">{% for e in resolved %}<li><code>{{ e.kind }}</code> — {{ e.reason | mask }}<br><span class="muted small">{{ e.resolution.action }} by {{ e.resolved_by }} at {{ e.resolved_at | when }}{% if e.resolution.note %} — {{ e.resolution.note | mask }}{% endif %}{% if e.resolution.facts_patch %} · patch <code>{{ e.resolution.facts_patch | tojson }}</code>{% endif %}</span></li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+
+    <section class="card">
+      <h2>Agent trace</h2>
+      <p class="handoffs"><span class="muted small">{{ state.handoffs | length }} handoffs, the orchestrator between each:</span><br>{% for h, n in hop_chain %}<span class="hop hop-{{ h }}">{{ h }}{% if n > 1 %} ×{{ n }}{% endif %}</span>{% if not loop.last %}<span class="arrow">→</span>{% endif %}{% endfor %}</p>
+      <ol class="events">{% for ev in state.events %}<li>{{ ev | mask }}</li>{% endfor %}</ol>
+    </section>
+
+    <section class="card">
+      <h2>Token log</h2>
+      {% if state.token_log %}
+      <table class="list">
+        <thead><tr><th>Agent</th><th>Model</th><th>Purpose</th><th class="num">In</th><th class="num">Out</th><th>At</th></tr></thead>
+        <tbody>{% for t in state.token_log %}<tr><td>{{ t.agent }}</td><td><code>{{ t.model }}</code></td><td>{{ t.purpose }}</td><td class="num">{{ t.tokens_in }}</td><td class="num">{{ t.tokens_out }}</td><td class="nowrap">{{ t.at | when }}</td></tr>{% endfor %}</tbody>
+        <tfoot><tr><td colspan="3">Total</td><td class="num">{{ state.token_log | sum(attribute="tokens_in") }}</td><td class="num">{{ state.token_log | sum(attribute="tokens_out") }}</td><td></td></tr></tfoot>
+      </table>
+      {% else %}<p class="muted">No model calls yet{% if not state.token_log %} (offline mode uses the scripted parser, fixture extraction and rules-only review){% endif %}.</p>{% endif %}
+    </section>
+
+    {% if state.lines %}
+    <section class="card">
+      <h2>Key lines</h2>
+      <table class="list">
+        <tbody>
+        {% for l in ("11a", "15", "16", "24", "33", "34", "37") %}<tr><td>{{ l }}</td><td>{{ state.provenance[l].label if l in state.provenance else l }}</td><td class="num">{{ state.lines[l] | money }}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      <p class="muted small">Every amount's provenance is on the <a href="/returns/{{ rid }}/form">draft form</a>.</p>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

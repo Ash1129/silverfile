@@ -52,7 +52,10 @@ def client():
     if _client is None:
         import anthropic
 
-        _client = anthropic.Anthropic(api_key=settings().api_key)
+        import os
+
+        headers = {"anthropic-workspace-id": os.environ["ANTHROPIC_WORKSPACE_ID"]} if os.environ.get("ANTHROPIC_WORKSPACE_ID") else {}
+        _client = anthropic.Anthropic(api_key=settings().api_key, default_headers=headers)
     return _client
 
 
@@ -65,9 +68,9 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // 4)
 
 
-def complete(system: str, messages: list[dict[str, Any]], *, model: str, max_tokens: int = 1200, temperature: float = 0.0) -> LLMResult:
+def complete(system: str, messages: list[dict[str, Any]], *, model: str, max_tokens: int = 1200) -> LLMResult:
     """Call Claude with a system prompt and a list of {role, content} messages."""
-    resp = client().messages.create(model=model, system=system, messages=messages, max_tokens=max_tokens, temperature=temperature)
+    resp = client().messages.create(model=model, system=system, messages=messages, max_tokens=max_tokens)
     text = "".join(getattr(b, "text", "") for b in resp.content)
     u = resp.usage
     tokens_in = int(getattr(u, "input_tokens", 0) or 0) + int(getattr(u, "cache_read_input_tokens", 0) or 0) + int(getattr(u, "cache_creation_input_tokens", 0) or 0)

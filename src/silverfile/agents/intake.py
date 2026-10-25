@@ -544,7 +544,9 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
 def _finish(state: ReturnState, facts: IntakeFacts, slot: str, question: str, text: str, reply: list[str], turns: int, escalations: list[Escalation], events: list[str], tin: int, tout: int, *, repeat: bool) -> dict[str, Any]:
     facts["_turns"] = turns + 1
     facts["_last_activity_at"] = now_iso()
-    msgs = [AIMessage(content=question), HumanMessage(content=text)]
+    # the transcript never needs a Social Security number: an accepted test SSN lives in the facts,
+    # and a rejected one must not survive in the checkpoint either
+    msgs = [AIMessage(content=question), HumanMessage(content=SSN_RE.sub("[number removed]", text))]
     if reply:
         msgs.append(AIMessage(content=" ".join(r for r in reply if r)))
     done = next_slot(facts) is None

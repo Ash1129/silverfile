@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}SilverFile{% endblock %} — Kushim dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/">SilverFile <span>Kushim preparer dashboard</span></a>
+    <nav><a href="/">All returns</a></nav>
+  </div>
+</header>
+<div class="draft-strip">{{ BANNER }}</div>
+<main class="wrap">
+{% block content %}{% endblock %}
+</main>
+<footer class="wrap muted">SilverFile prepares drafts for a Kushim preparer to check. It never files a return and never gives tax advice.</footer>
+</body>
+</html>

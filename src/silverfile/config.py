@@ -58,7 +58,7 @@ def settings() -> Settings:
         api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
         intake_model=os.environ.get("SILVERFILE_INTAKE_MODEL", "claude-haiku-5-5"),
         extraction_model=os.environ.get("SILVERFILE_EXTRACTION_MODEL", "claude-sonnet-5-5"),
-        review_model=os.environ.get("SILVERFILE_REVIEW_MODEL", "claude-sonnet-5-5"),
+        review_model=os.environ.get("SILVERFILE_REVIEW_MODEL", "claude-opus-5-5"),
         data_dir=data_dir,
         taxmath_direct=os.environ.get("SILVERFILE_TAXMATH_DIRECT", "0") == "1",
     )

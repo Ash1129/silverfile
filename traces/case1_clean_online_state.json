@@ -1,0 +1,1232 @@
+{
+ "return_id": "inspect-7c33",
+ "tax_year": 2025,
+ "created_at": "2026-10-25T20:23:38+00:00",
+ "status": "complete",
+ "intake": {
+  "answering_party": "self",
+  "taxpayer": {
+   "first_name": "Eleanor",
+   "last_name": "Whitfield",
+   "ssn": "912-34-5678",
+   "dob": "1954-03-14",
+   "blind": false
+  },
+  "spouse": null,
+  "married": false,
+  "spouse_died_in_year": false,
+  "filing_status": "single",
+  "dependents": [],
+  "can_be_claimed_as_dependent": false,
+  "documents_declared": [
+   "W-2",
+   "SSA-1099",
+   "1099-R",
+   "1099-INT"
+  ],
+  "other_income_sources": [],
+  "estimated_payments": 500.0,
+  "schedule1_adjustments": 0.0,
+  "schedule1_other_income": 0.0,
+  "schedule2_line3": 0.0,
+  "schedule3_line8": 0.0,
+  "refund_account_description": "my checking account at Finger Lakes Savings",
+  "refund_account_is_own": true,
+  "noted_questions": [],
+  "volunteered_ssn_events": [],
+  "_uploaded": true,
+  "_confirmed": true,
+  "_dependents_done": true
+ },
+ "intake_complete": true,
+ "documents_in": [
+  {
+   "id": "w2-image-1",
+   "kind": "W-2",
+   "path": "/Users/ashwinprajeeth/Documents/Coding/silverfile/demo/w2_image_1.jpg",
+   "declared_by": "fixture",
+   "uploaded_at": "2026-10-25T20:23:38+00:00"
+  },
+  {
+   "id": "1099int",
+   "kind": "1099-INT",
+   "path": "/Users/ashwinprajeeth/Documents/Coding/silverfile/data/fixtures/case1_clean/1099int.json",
+   "declared_by": "fixture",
+   "uploaded_at": "2026-10-25T20:23:38+00:00"
+  },
+  {
+   "id": "1099r",
+   "kind": "1099-R",
+   "path": "/Users/ashwinprajeeth/Documents/Coding/silverfile/data/fixtures/case1_clean/1099r.json",
+   "declared_by": "fixture",
+   "uploaded_at": "2026-10-25T20:23:38+00:00"
+  },
+  {
+   "id": "ssa1099",
+   "kind": "SSA-1099",
+   "path": "/Users/ashwinprajeeth/Documents/Coding/silverfile/data/fixtures/case1_clean/ssa1099.json",
+   "declared_by": "fixture",
+   "uploaded_at": "2026-10-25T20:23:38+00:00"
+  }
+ ],
+ "extracted": {
+  "w2-image-1": {
+   "id": "w2-image-1",
+   "kind": "W-2",
+   "version": 1,
+   "fields": {
+    "employee_name": "Eleanor M Whitfield",
+    "employee_ssn_last4": "5678",
+    "employer_name": "Tompkins Public Library",
+    "employer_ein": "16-1234567",
+    "wages": 18400.0,
+    "federal_withheld": 1210.0,
+    "social_security_wages": 18400.0,
+    "social_security_tax": 1140.8,
+    "medicare_wages": 18400.0,
+    "medicare_tax": 266.8,
+    "tax_year": "2025"
+   },
+   "boxes": {
+    "employee_name": "Box e",
+    "employee_ssn_last4": "Box a",
+    "employer_name": "Box c",
+    "employer_ein": "Box b",
+    "wages": "Box 1",
+    "federal_withheld": "Box 2",
+    "social_security_wages": "Box 3",
+    "social_security_tax": "Box 4",
+    "medicare_wages": "Box 5",
+    "medicare_tax": "Box 6",
+    "tax_year": "form header"
+   },
+   "confidence": 0.98,
+   "method": "vision:claude-sonnet-5-5",
+   "source_ref": "/Users/ashwinprajeeth/Documents/Coding/silverfile/demo/w2_image_1.jpg",
+   "issues": [
+    "Taxpayer's claim confirmed: the form is a W-2 (Form W-2 Wage and Tax Statement 2025, Copy B).",
+    "Header text at top right is cut off at the image edge (\"Copy B \u2014 To Be Filed With Employee's FEDERAL Tax Ret...\"); this does not affect any box values.",
+    "The footer states this is a SYNTHETIC TEST DOCUMENT for a demo and not a real form.",
+    "Boxes 7, 8, 9, 10, 11 and 12a are blank; they are not in the requested field list."
+   ],
+   "out_of_scope": false,
+   "extracted_at": "2026-10-25T20:23:41+00:00",
+   "tokens_in": 3195,
+   "tokens_out": 358
+  },
+  "1099int": {
+   "id": "1099int",
+   "kind": "1099-INT",
+   "version": 1,
+   "fields": {
+    "recipient_name": "Eleanor M Whitfield",
+    "payer_name": "Finger Lakes Savings",
+    "interest_income": 842.17,
+    "federal_withheld": 0.0,
+    "tax_exempt_interest": 0.0,
+    "tax_year": "2025"
+   },
+   "boxes": {
+    "recipient_name": "Recipient",
+    "payer_name": "Payer",
+    "interest_income": "Box 1",
+    "federal_withheld": "Box 4",
+    "tax_exempt_interest": "Box 8",
+    "tax_year": "form header"
+   },
+   "confidence": 1.0,
+   "method": "fixture",
+   "source_ref": "/Users/ashwinprajeeth/Documents/Coding/silverfile/data/fixtures/case1_clean/1099int.json",
+   "issues": [],
+   "out_of_scope": false,
+   "extracted_at": "2026-10-25T20:23:38+00:00",
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  "1099r": {
+   "id": "1099r",
+   "kind": "1099-R",
+   "version": 1,
+   "fields": {
+    "recipient_name": "Eleanor M Whitfield",
+    "payer_name": "Tompkins County Retirement System",
+    "gross_distribution": 14200.0,
+    "taxable_amount": 14200.0,
+    "taxable_not_determined": false,
+    "federal_withheld": 900.0,
+    "distribution_code": "7",
+    "ira_sep_simple": false,
+    "qcd_amount": null,
+    "tax_year": "2025"
+   },
+   "boxes": {
+    "recipient_name": "Recipient",
+    "payer_name": "Payer",
+    "gross_distribution": "Box 1",
+    "taxable_amount": "Box 2a",
+    "taxable_not_determined": "Box 2b",
+    "federal_withheld": "Box 4",
+    "distribution_code": "Box 7",
+    "ira_sep_simple": "Box 7 IRA/SEP/SIMPLE",
+    "qcd_amount": "QCD (noted)",
+    "tax_year": "form header"
+   },
+   "confidence": 1.0,
+   "method": "fixture",
+   "source_ref": "/Users/ashwinprajeeth/Documents/Coding/silverfile/data/fixtures/case1_clean/1099r.json",
+   "issues": [],
+   "out_of_scope": false,
+   "extracted_at": "2026-10-25T20:23:38+00:00",
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  "ssa1099": {
+   "id": "ssa1099",
+   "kind": "SSA-1099",
+   "version": 1,
+   "fields": {
+    "recipient_name": "Eleanor M Whitfield",
+    "net_benefits": 21600.0,
+    "federal_withheld": 0.0,
+    "tax_year": "2025"
+   },
+   "boxes": {
+    "recipient_name": "Box 1",
+    "net_benefits": "Box 5",
+    "federal_withheld": "Box 6",
+    "tax_year": "form header"
+   },
+   "confidence": 1.0,
+   "method": "fixture",
+   "source_ref": "/Users/ashwinprajeeth/Documents/Coding/silverfile/data/fixtures/case1_clean/ssa1099.json",
+   "issues": [],
+   "out_of_scope": false,
+   "extracted_at": "2026-10-25T20:23:38+00:00",
+   "tokens_in": 0,
+   "tokens_out": 0
+  }
+ },
+ "extraction_done": true,
+ "eligibility": {
+  "eligible_1040sr": true,
+  "filing_status": "single",
+  "filing_status_valid": true,
+  "boxes_12d": {
+   "taxpayer_65": true,
+   "taxpayer_blind": false,
+   "spouse_65": false,
+   "spouse_blind": false
+  },
+  "box_count": 1,
+  "chart_applies": true,
+  "schedules": [
+   "Schedule 1-A"
+  ],
+  "in_scope": true,
+  "out_of_scope_items": [],
+  "conflicts": [],
+  "citations": [
+   "REF-FS-1",
+   "REF-EL-1",
+   "REF-SD-3",
+   "REF-SD-4",
+   "REF-SC-1"
+  ],
+  "determinations": [
+   {
+    "claim": "Filing status 'single' is one of the five in-scope statuses",
+    "result": true,
+    "citation": "REF-FS-1"
+   },
+   {
+    "claim": "Taxpayer (or a spouse on a joint return) was born before 2 January 1961",
+    "result": true,
+    "citation": "REF-EL-1"
+   },
+   {
+    "claim": "Boxes checked on line 12d",
+    "result": 1,
+    "citation": "REF-SD-3"
+   },
+   {
+    "claim": "Standard Deduction Chart applies",
+    "result": true,
+    "citation": "REF-SD-4"
+   },
+   {
+    "claim": "Everything declared or uploaded is within the in-scope profile",
+    "result": true,
+    "citation": "REF-SC-1"
+   },
+   {
+    "claim": "Schedules that apply",
+    "result": [
+     "Schedule 1-A"
+    ],
+    "citation": "REF-SC-1"
+   }
+  ],
+  "escalate": []
+ },
+ "lines": {
+  "1z": 18400.0,
+  "25a": 1210.0,
+  "2b": 842.17,
+  "2a": 0.0,
+  "3b": 0.0,
+  "3a": 0.0,
+  "4a": 0.0,
+  "4b": 0.0,
+  "5a": 14200.0,
+  "5b": 14200.0,
+  "6a": 21600.0,
+  "25b": 900.0,
+  "25c": 0.0,
+  "8": 0.0,
+  "10": 0.0,
+  "17": 0.0,
+  "23": 0.0,
+  "20": 0.0,
+  "26": 500.0,
+  "7": 0.0,
+  "19": 0.0,
+  "6b": 13205.84,
+  "9": 46648.01,
+  "11a": 46648.01,
+  "12d": 1.0,
+  "12e": 17750.0,
+  "13b": 6000.0,
+  "14": 23750.0,
+  "15": 22898.01,
+  "16": 2509.26,
+  "18": 2509.26,
+  "21": 0.0,
+  "22": 2509.26,
+  "24": 2509.26,
+  "25d": 2110.0,
+  "32": 0.0,
+  "33": 2610.0,
+  "34": 100.74,
+  "37": 0.0
+ },
+ "provenance": {
+  "1z": {
+   "line": "1z",
+   "label": "Total wages, salaries, tips",
+   "amount": 18400.0,
+   "source_kind": "document",
+   "sources": [
+    "w2-image-1"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     18400.0
+    ],
+    "boxes": [
+     "Box 1"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-SC-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "25a": {
+   "line": "25a",
+   "label": "Federal income tax withheld from W-2",
+   "amount": 1210.0,
+   "source_kind": "document",
+   "sources": [
+    "w2-image-1"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     1210.0
+    ],
+    "boxes": [
+     "Box 2"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "2b": {
+   "line": "2b",
+   "label": "Taxable interest",
+   "amount": 842.17,
+   "source_kind": "document",
+   "sources": [
+    "1099int"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     842.17
+    ],
+    "boxes": [
+     "Box 1"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "2a": {
+   "line": "2a",
+   "label": "Tax-exempt interest",
+   "amount": 0.0,
+   "source_kind": "document",
+   "sources": [
+    "1099int"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     0.0
+    ],
+    "boxes": [
+     "Box 8"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "3b": {
+   "line": "3b",
+   "label": "Ordinary dividends",
+   "amount": 0.0,
+   "source_kind": "document",
+   "sources": [],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [],
+    "boxes": []
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "3a": {
+   "line": "3a",
+   "label": "Qualified dividends",
+   "amount": 0.0,
+   "source_kind": "document",
+   "sources": [],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [],
+    "boxes": []
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "4a": {
+   "line": "4a",
+   "label": "IRA distributions (total)",
+   "amount": 0.0,
+   "source_kind": "document",
+   "sources": [
+    "1099r"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [],
+    "boxes": []
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-RT-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "4b": {
+   "line": "4b",
+   "label": "IRA distributions (taxable)",
+   "amount": 0.0,
+   "source_kind": "document",
+   "sources": [
+    "1099r"
+   ],
+   "method": "tax_math.taxable_1099r + sum_amounts",
+   "inputs": {
+    "amounts": []
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-RT-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "5a": {
+   "line": "5a",
+   "label": "Pensions and annuities (total)",
+   "amount": 14200.0,
+   "source_kind": "document",
+   "sources": [
+    "1099r"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     14200.0
+    ],
+    "boxes": [
+     "Box 1 (pension)"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-RT-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "5b": {
+   "line": "5b",
+   "label": "Pensions and annuities (taxable)",
+   "amount": 14200.0,
+   "source_kind": "document",
+   "sources": [
+    "1099r"
+   ],
+   "method": "tax_math.taxable_1099r + sum_amounts",
+   "inputs": {
+    "amounts": [
+     14200.0
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-RT-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "6a": {
+   "line": "6a",
+   "label": "Social Security benefits (total)",
+   "amount": 21600.0,
+   "source_kind": "document",
+   "sources": [
+    "ssa1099"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     21600.0
+    ],
+    "boxes": [
+     "Box 5"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-SS-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "25b": {
+   "line": "25b",
+   "label": "Federal income tax withheld from 1099",
+   "amount": 900.0,
+   "source_kind": "document",
+   "sources": [
+    "1099r",
+    "ssa1099"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "amounts": [
+     900.0,
+     0.0
+    ],
+    "boxes": [
+     "Box 4 (1099-R)",
+     "Box 6 (SSA-1099)"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "25c": {
+   "line": "25c",
+   "label": "Federal income tax withheld, other forms",
+   "amount": 0.0,
+   "source_kind": "computed",
+   "sources": [],
+   "method": "none in profile",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "8": {
+   "line": "8",
+   "label": "Additional income (Schedule 1, line 10)",
+   "amount": 0.0,
+   "source_kind": "user",
+   "sources": [
+    "intake"
+   ],
+   "method": "direct user input",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": "taxpayer",
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "10": {
+   "line": "10",
+   "label": "Adjustments to income (Schedule 1, line 26)",
+   "amount": 0.0,
+   "source_kind": "user",
+   "sources": [
+    "intake"
+   ],
+   "method": "direct user input",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": "taxpayer",
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "17": {
+   "line": "17",
+   "label": "Amount from Schedule 2, line 3",
+   "amount": 0.0,
+   "source_kind": "user",
+   "sources": [
+    "intake"
+   ],
+   "method": "direct user input",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": "taxpayer",
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "23": {
+   "line": "23",
+   "label": "Other taxes (Schedule 2, line 21)",
+   "amount": 0.0,
+   "source_kind": "user",
+   "sources": [
+    "intake"
+   ],
+   "method": "direct user input",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": "taxpayer",
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": "not provided; treated as 0"
+  },
+  "20": {
+   "line": "20",
+   "label": "Amount from Schedule 3, line 8",
+   "amount": 0.0,
+   "source_kind": "user",
+   "sources": [
+    "intake"
+   ],
+   "method": "direct user input",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": "taxpayer",
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "26": {
+   "line": "26",
+   "label": "2025 estimated tax payments",
+   "amount": 500.0,
+   "source_kind": "user",
+   "sources": [
+    "intake"
+   ],
+   "method": "direct user input",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": "taxpayer",
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "7": {
+   "line": "7",
+   "label": "Capital gain or (loss)",
+   "amount": 0.0,
+   "source_kind": "computed",
+   "sources": [],
+   "method": "out of scope (Schedule D); 0 by profile",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [
+    "REF-SC-2"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "19": {
+   "line": "19",
+   "label": "Child tax credit / credit for other dependents",
+   "amount": 0.0,
+   "source_kind": "computed",
+   "sources": [],
+   "method": "no credit claimed in profile",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "6b": {
+   "line": "6b",
+   "label": "Social Security benefits (taxable)",
+   "amount": 13205.84,
+   "source_kind": "worksheet",
+   "sources": [
+    "6a",
+    "2a",
+    "1z",
+    "2b",
+    "3b",
+    "4b",
+    "5b",
+    "8",
+    "10"
+   ],
+   "method": "tax_math.taxable_social_security",
+   "inputs": {
+    "filing_status": "single",
+    "total_benefits": 21600.0,
+    "agi_excluding_benefits": 33442.17,
+    "tax_exempt_interest": 0.0,
+    "provisional_income": 44242.17,
+    "tier": "second-tier"
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-SS-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "9": {
+   "line": "9",
+   "label": "Total income",
+   "amount": 46648.01,
+   "source_kind": "computed",
+   "sources": [
+    "1z",
+    "2b",
+    "3b",
+    "4b",
+    "5b",
+    "6b",
+    "7",
+    "8"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "1z",
+     "2b",
+     "3b",
+     "4b",
+     "5b",
+     "6b",
+     "7",
+     "8"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "11a": {
+   "line": "11a",
+   "label": "Adjusted gross income",
+   "amount": 46648.01,
+   "source_kind": "computed",
+   "sources": [
+    "9",
+    "10"
+   ],
+   "method": "tax_math.subtract",
+   "inputs": {
+    "a": 46648.01,
+    "b": 0.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "12d": {
+   "line": "12d",
+   "label": "Age / blindness boxes checked",
+   "amount": 1.0,
+   "source_kind": "chart",
+   "sources": [
+    "intake"
+   ],
+   "method": "tax_math.count_12d_boxes",
+   "inputs": {
+    "taxpayer_65": true,
+    "taxpayer_blind": false,
+    "spouse_65": false,
+    "spouse_blind": false
+   },
+   "transport": "n/a",
+   "citations": [
+    "REF-SD-3"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "12e": {
+   "line": "12e",
+   "label": "Standard deduction",
+   "amount": 17750.0,
+   "source_kind": "chart",
+   "sources": [
+    "12d"
+   ],
+   "method": "tax_math.standard_deduction",
+   "inputs": {
+    "filing_status": "single",
+    "boxes_checked": 1,
+    "base": 15750.0,
+    "per_box": 2000.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-SD-1",
+    "REF-SD-2"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "13b": {
+   "line": "13b",
+   "label": "Additional deductions (Schedule 1-A)",
+   "amount": 6000.0,
+   "source_kind": "computed",
+   "sources": [
+    "11a",
+    "12d"
+   ],
+   "method": "tax_math.senior_deduction",
+   "inputs": {
+    "filing_status": "single",
+    "magi": 46648.01,
+    "qualifying_persons": 1,
+    "threshold": 75000.0,
+    "excess_magi": 0.0,
+    "reduction_per_person": 0.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-SR-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "14": {
+   "line": "14",
+   "label": "Total deductions",
+   "amount": 23750.0,
+   "source_kind": "computed",
+   "sources": [
+    "12e",
+    "13b"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "12e",
+     "13b"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "15": {
+   "line": "15",
+   "label": "Taxable income",
+   "amount": 22898.01,
+   "source_kind": "computed",
+   "sources": [
+    "11a",
+    "14"
+   ],
+   "method": "tax_math.nonnegative_difference",
+   "inputs": {
+    "a": 46648.01,
+    "b": 23750.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "16": {
+   "line": "16",
+   "label": "Tax (rate schedule)",
+   "amount": 2509.26,
+   "source_kind": "rate-schedule",
+   "sources": [
+    "15"
+   ],
+   "method": "tax_math.income_tax",
+   "inputs": {
+    "filing_status": "single",
+    "taxable_income": 22898.01,
+    "brackets": [
+     {
+      "from": 0.0,
+      "to": 11925.0,
+      "rate": 0.1,
+      "tax": 1192.5
+     },
+     {
+      "from": 11925.0,
+      "to": 22898.01,
+      "rate": 0.12,
+      "tax": 1316.76
+     }
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [
+    "REF-TX-1"
+   ],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "18": {
+   "line": "18",
+   "label": "Add lines 16 and 17",
+   "amount": 2509.26,
+   "source_kind": "computed",
+   "sources": [
+    "16",
+    "17"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "16",
+     "17"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "21": {
+   "line": "21",
+   "label": "Add lines 19 and 20",
+   "amount": 0.0,
+   "source_kind": "computed",
+   "sources": [
+    "19",
+    "20"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "19",
+     "20"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "22": {
+   "line": "22",
+   "label": "Subtract line 21 from line 18",
+   "amount": 2509.26,
+   "source_kind": "computed",
+   "sources": [
+    "18",
+    "21"
+   ],
+   "method": "tax_math.nonnegative_difference",
+   "inputs": {
+    "a": 2509.26,
+    "b": 0.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "24": {
+   "line": "24",
+   "label": "Total tax",
+   "amount": 2509.26,
+   "source_kind": "computed",
+   "sources": [
+    "22",
+    "23"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "22",
+     "23"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "25d": {
+   "line": "25d",
+   "label": "Total federal income tax withheld",
+   "amount": 2110.0,
+   "source_kind": "computed",
+   "sources": [
+    "25a",
+    "25b",
+    "25c"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "25a",
+     "25b",
+     "25c"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "32": {
+   "line": "32",
+   "label": "Total other payments and refundable credits",
+   "amount": 0.0,
+   "source_kind": "computed",
+   "sources": [],
+   "method": "no refundable credits in profile",
+   "inputs": {},
+   "transport": "n/a",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "33": {
+   "line": "33",
+   "label": "Total payments",
+   "amount": 2610.0,
+   "source_kind": "computed",
+   "sources": [
+    "25d",
+    "26",
+    "32"
+   ],
+   "method": "tax_math.sum_amounts",
+   "inputs": {
+    "lines": [
+     "25d",
+     "26",
+     "32"
+    ]
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "34": {
+   "line": "34",
+   "label": "Overpaid",
+   "amount": 100.74,
+   "source_kind": "computed",
+   "sources": [
+    "33",
+    "24"
+   ],
+   "method": "tax_math.settle",
+   "inputs": {
+    "total_tax": 2509.26,
+    "total_payments": 2610.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  },
+  "37": {
+   "line": "37",
+   "label": "Amount you owe",
+   "amount": 0.0,
+   "source_kind": "computed",
+   "sources": [
+    "24",
+    "33"
+   ],
+   "method": "tax_math.settle",
+   "inputs": {
+    "total_tax": 2509.26,
+    "total_payments": 2610.0
+   },
+   "transport": "mcp-stdio",
+   "citations": [],
+   "entered_by": null,
+   "entered_at": "2026-10-25T20:23:42+00:00",
+   "note": null
+  }
+ },
+ "computation_version": 1,
+ "computation_notes": [],
+ "review_history": [
+  {
+   "round": 1,
+   "passed": true,
+   "findings": [],
+   "recomputed_lines": {
+    "6b": 13205.84,
+    "9": 46648.01,
+    "11a": 46648.01,
+    "12e": 17750.0,
+    "13b": 6000.0,
+    "14": 23750.0,
+    "15": 22898.01,
+    "16": 2509.26,
+    "18": 2509.26,
+    "21": 0.0,
+    "22": 2509.26,
+    "24": 2509.26,
+    "25d": 2110.0,
+    "33": 2610.0,
+    "34": 100.74,
+    "37": 0.0
+   },
+   "method": "rules+claude-opus-5-5",
+   "tokens_in": 4184,
+   "tokens_out": 800,
+   "at": "2026-10-25T20:23:51+00:00"
+  }
+ ],
+ "review_round": 1,
+ "review_passed": true,
+ "revise_target": null,
+ "revise_reasons": [],
+ "escalations": [],
+ "handoffs": [
+  "orchestrator",
+  "extraction",
+  "orchestrator",
+  "eligibility",
+  "orchestrator",
+  "computation",
+  "orchestrator",
+  "review",
+  "orchestrator",
+  "finalize"
+ ],
+ "loop_guard_tripped": false,
+ "next_agent": "finalize",
+ "token_log": [
+  {
+   "agent": "extraction",
+   "model": "vision:claude-sonnet-5-5",
+   "purpose": "extract W-2 w2-image-1",
+   "tokens_in": 3195,
+   "tokens_out": 358,
+   "at": "2026-10-25T20:23:41+00:00"
+  },
+  {
+   "agent": "review",
+   "model": "rules+claude-opus-5-5",
+   "purpose": "review round 1",
+   "tokens_in": 4184,
+   "tokens_out": 800,
+   "at": "2026-10-25T20:23:51+00:00"
+  }
+ ],
+ "events": [
+  "return inspect-7c33 created",
+  "orchestrator -> extraction",
+  "extraction: w2-image-1 -> W-2 via vision:claude-sonnet-5-5 (4 issues)",
+  "extraction: 1099int -> 1099-INT via fixture (0 issues)",
+  "extraction: 1099r -> 1099-R via fixture (0 issues)",
+  "extraction: ssa1099 -> SSA-1099 via fixture (0 issues)",
+  "extraction: aggregated 4 document record(s)",
+  "orchestrator -> eligibility",
+  "eligibility: eligible=True fs=single boxes=1 chart=True scope_ok=True escalations=0",
+  "orchestrator -> computation",
+  "computation v1: 30 tax_math calls over ['mcp-stdio']; taxable income 22898.01, tax 2509.26, owed 0.0, overpaid 100.74",
+  "orchestrator -> review",
+  "review round 1: PASS (0 finding(s); send to None)",
+  "orchestrator -> finalize",
+  "finalize: draft complete at 2026-10-25T20:23:51+00:00 after 1 review round(s)"
+ ],
+ "fault_injection": {}
+}

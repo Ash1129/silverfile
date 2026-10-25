@@ -1,0 +1,38 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	orchestrator(orchestrator)
+	intake(intake)
+	extract_document(extract_document)
+	aggregate_extraction(aggregate_extraction)
+	eligibility(eligibility)
+	computation(computation)
+	review(review)
+	escalation(escalation)
+	finalize(finalize)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> orchestrator;
+	aggregate_extraction --> orchestrator;
+	computation --> orchestrator;
+	eligibility --> orchestrator;
+	escalation --> orchestrator;
+	extract_document --> aggregate_extraction;
+	intake --> orchestrator;
+	orchestrator -.-> aggregate_extraction;
+	orchestrator -.-> computation;
+	orchestrator -.-> eligibility;
+	orchestrator -.-> escalation;
+	orchestrator -.-> extract_document;
+	orchestrator -.-> finalize;
+	orchestrator -.-> intake;
+	orchestrator -.-> review;
+	review --> orchestrator;
+	finalize --> __end__;
+	orchestrator -.-> orchestrator;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

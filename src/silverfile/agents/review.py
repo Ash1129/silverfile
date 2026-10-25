@@ -26,7 +26,7 @@ REQUIRED_LINES = ["1z", "2a", "2b", "3a", "3b", "4a", "4b", "5a", "5b", "6a", "6
 
 REVIEW_SYSTEM = """You are an adversarial auditor for a draft US Form 1040-SR prepared by software. Your job is to find errors, not to fix them.
 You get the computed lines, the provenance record for each line, and the extracted documents. Check: does each line follow from its sources; are there contradictions; did anything out of the stated scope slip in; is any amount unsourced.
-Return JSON: {"findings": [{"severity": "high|medium|low", "line": "...", "check": "...", "detail": "...", "send_to": "computation|extraction|eligibility|intake|human"}]}. Return an empty list if you find nothing. Never propose corrected numbers."""
+Return JSON: {"findings": [{"severity": "high|medium|low", "line": "...", "check": "...", "detail": "...", "send_to": "computation|extraction|eligibility|intake|human"}]}. Return an empty list if you find nothing. Never propose corrected numbers. Reply with the JSON only, no prose, and keep every detail under 40 words: a truncated reply is discarded."""
 
 
 def _f(sev: str, check: str, detail: str, line: str | None = None, send_to: str | None = "computation", fixable: bool = True) -> Finding:
@@ -132,10 +132,15 @@ def claude_checks(state: ReturnState) -> tuple[list[Finding], int, int, str]:
         "provenance": {k: {"method": v.get("method"), "sources": v.get("sources"), "inputs": v.get("inputs"), "amount": v.get("amount")} for k, v in (state.get("provenance") or {}).items()},
         "documents": {k: {"kind": v.get("kind"), "fields": v.get("fields"), "issues": v.get("issues")} for k, v in (state.get("extracted") or {}).items()},
         "scope": "W-2, SSA-1099, 1099-R (box 2b unchecked), 1099-INT, 1099-DIV; standard deduction; Schedule 1-A. Everything else is out of scope.",
+        "firm_rules": "This is a DRAFT for a human preparer. By the firm's rulebook line 16 is computed from the 2025 rate-schedule formulas (the Tax Table's 50-dollar banding is applied by the preparer at filing, not here). Standard and senior deduction figures are the firm's 2025 rulebook amounts. Amounts the taxpayer stated in intake (estimated payments, dates of birth) are legitimate sources for a draft when the provenance says so; flag them as low severity for the preparer, not as errors. The documents are synthetic test fixtures by design.",
     }
     try:
-        res = llm.complete(REVIEW_SYSTEM, [{"role": "user", "content": json.dumps(compact, default=str)}], model=model, max_tokens=800)
-        data = res.json() or {}
+        res = llm.complete(REVIEW_SYSTEM, [{"role": "user", "content": json.dumps(compact, default=str)}], model=model, max_tokens=2000)
+        data = res.json()
+        if not isinstance(data, dict):
+            # a reply that is not the requested JSON (for example one cut off at the output cap)
+            # must not pass silently as "no findings"
+            raise ValueError(f"reply was not the requested JSON ({res.tokens_out} output tokens)")
         out = []
         for i, f in enumerate(data.get("findings") or []):
             sev = f.get("severity", "low")

@@ -1,0 +1,178 @@
+{
+ "none": {
+  "strategy": "none",
+  "model": "claude-sonnet-5-5",
+  "online": true,
+  "at": "2026-10-25T20:21:55+00:00",
+  "rows": [
+   {
+    "doc": 1,
+    "file": "w2_01.jpg",
+    "tokens_in": 2436,
+    "tokens_out": 131,
+    "wages": "10,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 2,
+    "file": "w2_02.jpg",
+    "tokens_in": 4922,
+    "tokens_out": 131,
+    "wages": "11,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 3,
+    "file": "w2_03.jpg",
+    "tokens_in": 7408,
+    "tokens_out": 131,
+    "wages": "12,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 4,
+    "file": "w2_04.jpg",
+    "tokens_in": 9894,
+    "tokens_out": 131,
+    "wages": "13,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 5,
+    "file": "w2_05.jpg",
+    "tokens_in": 12380,
+    "tokens_out": 131,
+    "wages": "14,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 6,
+    "file": "w2_06.jpg",
+    "tokens_in": 14866,
+    "tokens_out": 131,
+    "wages": "15,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 7,
+    "file": "w2_07.jpg",
+    "tokens_in": 17352,
+    "tokens_out": 131,
+    "wages": "16,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 8,
+    "file": "w2_08.jpg",
+    "tokens_in": 19838,
+    "tokens_out": 131,
+    "wages": "17,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 9,
+    "file": "w2_09.jpg",
+    "tokens_in": 22324,
+    "tokens_out": 135,
+    "wages": "18,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 10,
+    "file": "w2_10.jpg",
+    "tokens_in": 24814,
+    "tokens_out": 135,
+    "wages": "19,000.00",
+    "parsed": true
+   }
+  ]
+ },
+ "selective": {
+  "strategy": "selective",
+  "model": "claude-sonnet-5-5",
+  "online": true,
+  "at": "2026-10-25T20:22:20+00:00",
+  "rows": [
+   {
+    "doc": 1,
+    "file": "w2_01.jpg",
+    "tokens_in": 2453,
+    "tokens_out": 147,
+    "wages": "10,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 2,
+    "file": "w2_02.jpg",
+    "tokens_in": 2532,
+    "tokens_out": 146,
+    "wages": "11,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 3,
+    "file": "w2_03.jpg",
+    "tokens_in": 2614,
+    "tokens_out": 146,
+    "wages": "12,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 4,
+    "file": "w2_04.jpg",
+    "tokens_in": 2696,
+    "tokens_out": 146,
+    "wages": "13,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 5,
+    "file": "w2_05.jpg",
+    "tokens_in": 2778,
+    "tokens_out": 146,
+    "wages": "14,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 6,
+    "file": "w2_06.jpg",
+    "tokens_in": 2860,
+    "tokens_out": 146,
+    "wages": "15,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 7,
+    "file": "w2_07.jpg",
+    "tokens_in": 2942,
+    "tokens_out": 146,
+    "wages": "16,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 8,
+    "file": "w2_08.jpg",
+    "tokens_in": 3024,
+    "tokens_out": 146,
+    "wages": "17,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 9,
+    "file": "w2_09.jpg",
+    "tokens_in": 3106,
+    "tokens_out": 150,
+    "wages": "18,000.00",
+    "parsed": true
+   },
+   {
+    "doc": 10,
+    "file": "w2_10.jpg",
+    "tokens_in": 3190,
+    "tokens_out": 150,
+    "wages": "19,000.00",
+    "parsed": true
+   }
+  ]
+ }
+}

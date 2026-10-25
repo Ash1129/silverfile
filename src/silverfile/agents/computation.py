@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..faults import apply_computation_faults
 from ..provenance import record, user_input
 from ..state import Provenance, ReturnState
 from ..tax_math.client import TaxMathClient
@@ -38,14 +39,14 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
     fs = elig.get("filing_status") or facts.get("filing_status") or "single"
     entered_by = "taxpayer" if facts.get("answering_party") in (None, "self", "unknown") else "third party (with stated authority)"
     fault = state.get("fault_injection") or {}
-    version = int(state.get("computation_version", 0)) + 1
+    version = int(state.get("computation_version", 0))  # assigned by the orchestrator
     lines: dict[str, float] = {}
     prov: dict[str, Provenance] = {}
     notes: list[str] = []
 
     with TaxMathClient() as tm:
         def put(line: str, amount: float, **kw: Any) -> float:
-            lines[line] = round(float(amount), 2)
+            lines[line] = float(amount)  # tools return cents-rounded values already
             prov[line] = record(line, amount, **kw)
             return lines[line]
 
@@ -58,21 +59,21 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
         # ---- income lines straight from documents -------------------------
         w2s = _docs_of(state, "W-2")
         wages = [_num(d["fields"].get("wages")) for d in w2s]
-        put("1z", call("sum_amounts", amounts=wages), source_kind="document", sources=[d["id"] for d in w2s], method="tax_math.sum_amounts", inputs={"amounts": wages, "boxes": ["Box 1"] * len(w2s)}, transport=last(), citations=["REF-SC-1"])
+        put("1z", call("sum_amounts", amounts=wages), source_kind="document", sources=[d["id"] for d in w2s], method="tax_math.sum_amounts", inputs={"amounts": wages, "boxes": ["Box 1" for _ in w2s]}, transport=last(), citations=["REF-SC-1"])
         w2_wh = [_num(d["fields"].get("federal_withheld")) for d in w2s]
-        put("25a", call("sum_amounts", amounts=w2_wh), source_kind="document", sources=[d["id"] for d in w2s], method="tax_math.sum_amounts", inputs={"amounts": w2_wh, "boxes": ["Box 2"] * len(w2s)}, transport=last())
+        put("25a", call("sum_amounts", amounts=w2_wh), source_kind="document", sources=[d["id"] for d in w2s], method="tax_math.sum_amounts", inputs={"amounts": w2_wh, "boxes": ["Box 2" for _ in w2s]}, transport=last())
 
         ints = _docs_of(state, "1099-INT")
         ti = [_num(d["fields"].get("interest_income")) for d in ints]
         te = [_num(d["fields"].get("tax_exempt_interest")) for d in ints]
-        put("2b", call("sum_amounts", amounts=ti), source_kind="document", sources=[d["id"] for d in ints], method="tax_math.sum_amounts", inputs={"amounts": ti, "boxes": ["Box 1"] * len(ints)}, transport=last())
-        put("2a", call("sum_amounts", amounts=te), source_kind="document", sources=[d["id"] for d in ints], method="tax_math.sum_amounts", inputs={"amounts": te, "boxes": ["Box 8"] * len(ints)}, transport=last())
+        put("2b", call("sum_amounts", amounts=ti), source_kind="document", sources=[d["id"] for d in ints], method="tax_math.sum_amounts", inputs={"amounts": ti, "boxes": ["Box 1" for _ in ints]}, transport=last())
+        put("2a", call("sum_amounts", amounts=te), source_kind="document", sources=[d["id"] for d in ints], method="tax_math.sum_amounts", inputs={"amounts": te, "boxes": ["Box 8" for _ in ints]}, transport=last())
 
         divs = _docs_of(state, "1099-DIV")
         od = [_num(d["fields"].get("ordinary_dividends")) for d in divs]
         qd = [_num(d["fields"].get("qualified_dividends")) for d in divs]
-        put("3b", call("sum_amounts", amounts=od), source_kind="document", sources=[d["id"] for d in divs], method="tax_math.sum_amounts", inputs={"amounts": od, "boxes": ["Box 1a"] * len(divs)}, transport=last())
-        put("3a", call("sum_amounts", amounts=qd), source_kind="document", sources=[d["id"] for d in divs], method="tax_math.sum_amounts", inputs={"amounts": qd, "boxes": ["Box 1b"] * len(divs)}, transport=last())
+        put("3b", call("sum_amounts", amounts=od), source_kind="document", sources=[d["id"] for d in divs], method="tax_math.sum_amounts", inputs={"amounts": od, "boxes": ["Box 1a" for _ in divs]}, transport=last())
+        put("3a", call("sum_amounts", amounts=qd), source_kind="document", sources=[d["id"] for d in divs], method="tax_math.sum_amounts", inputs={"amounts": qd, "boxes": ["Box 1b" for _ in divs]}, transport=last())
         if lines["3a"]:
             notes.append("Line 3a (qualified dividends) is non-zero. Per the brief, line 16 uses the rate schedule; the preparer should check whether the qualified dividends worksheet changes the tax (REF-TX-1).")
 
@@ -86,22 +87,22 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
             (ira_tax if is_ira else pen_tax).append(r["taxable"])
             r_wh.append(_num(f.get("federal_withheld")))
             r_ids.append(d["id"])
-        put("4a", call("sum_amounts", amounts=ira_tot), source_kind="document", sources=r_ids, method="tax_math.sum_amounts", inputs={"amounts": ira_tot, "boxes": ["Box 1 (IRA)"] * len(ira_tot)}, transport=last(), citations=["REF-RT-1"])
+        put("4a", call("sum_amounts", amounts=ira_tot), source_kind="document", sources=r_ids, method="tax_math.sum_amounts", inputs={"amounts": ira_tot, "boxes": ["Box 1 (IRA)" for _ in ira_tot]}, transport=last(), citations=["REF-RT-1"])
         put("4b", call("sum_amounts", amounts=ira_tax), source_kind="document", sources=r_ids, method="tax_math.taxable_1099r + sum_amounts", inputs={"amounts": ira_tax}, transport=last(), citations=["REF-RT-1"])
-        put("5a", call("sum_amounts", amounts=pen_tot), source_kind="document", sources=r_ids, method="tax_math.sum_amounts", inputs={"amounts": pen_tot, "boxes": ["Box 1 (pension)"] * len(pen_tot)}, transport=last(), citations=["REF-RT-1"])
+        put("5a", call("sum_amounts", amounts=pen_tot), source_kind="document", sources=r_ids, method="tax_math.sum_amounts", inputs={"amounts": pen_tot, "boxes": ["Box 1 (pension)" for _ in pen_tot]}, transport=last(), citations=["REF-RT-1"])
         put("5b", call("sum_amounts", amounts=pen_tax), source_kind="document", sources=r_ids, method="tax_math.taxable_1099r + sum_amounts", inputs={"amounts": pen_tax}, transport=last(), citations=["REF-RT-1"])
 
         ssas = _docs_of(state, "SSA-1099")
         ben = [_num(d["fields"].get("net_benefits")) for d in ssas]
         ssa_wh = [_num(d["fields"].get("federal_withheld")) for d in ssas]
-        put("6a", call("sum_amounts", amounts=ben), source_kind="document", sources=[d["id"] for d in ssas], method="tax_math.sum_amounts", inputs={"amounts": ben, "boxes": ["Box 5"] * len(ssas)}, transport=last(), citations=["REF-SS-1"])
-        put("25b", call("sum_amounts", amounts=[*r_wh, *ssa_wh]), source_kind="document", sources=[*r_ids, *[d["id"] for d in ssas]], method="tax_math.sum_amounts", inputs={"amounts": [*r_wh, *ssa_wh], "boxes": ["Box 4 (1099-R)"] * len(r_wh) + ["Box 6 (SSA-1099)"] * len(ssa_wh)}, transport=last())
+        put("6a", call("sum_amounts", amounts=ben), source_kind="document", sources=[d["id"] for d in ssas], method="tax_math.sum_amounts", inputs={"amounts": ben, "boxes": ["Box 5" for _ in ssas]}, transport=last(), citations=["REF-SS-1"])
+        put("25b", call("sum_amounts", amounts=[*r_wh, *ssa_wh]), source_kind="document", sources=[*r_ids, *[d["id"] for d in ssas]], method="tax_math.sum_amounts", inputs={"amounts": [*r_wh, *ssa_wh], "boxes": [*["Box 4 (1099-R)" for _ in r_wh], *["Box 6 (SSA-1099)" for _ in ssa_wh]]}, transport=last())
         put("25c", 0.0, source_kind="computed", sources=[], method="none in profile", transport="n/a")
 
         # ---- direct user inputs (Schedules 1, 2, 3; estimated payments) -----
         for line, key in (("8", "schedule1_other_income"), ("10", "schedule1_adjustments"), ("17", "schedule2_line3"), ("23", "schedule2_line21"), ("20", "schedule3_line8"), ("26", "estimated_payments")):
             v = _num(facts.get(key))
-            lines[line] = round(v, 2)
+            lines[line] = call("sum_amounts", amounts=[v])  # normalised to cents by the tool, not here
             prov[line] = user_input(line, v, entered_by, note=None if facts.get(key) not in (None, "") else "not provided; treated as 0")
         lines["7"] = 0.0
         prov["7"] = record("7", 0.0, source_kind="computed", sources=[], method="out of scope (Schedule D); 0 by profile", citations=["REF-SC-2"])
@@ -121,7 +122,10 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
         boxes = elig.get("boxes_12d") or {}
         count = int(elig.get("box_count") or 0)
         lines["12d"] = float(count)
-        prov["12d"] = record("12d", count, source_kind="chart", sources=["intake"], method="tax_math.count_12d_boxes", inputs=dict(boxes), citations=["REF-SD-3"])
+        tp_ = (state.get("intake") or {}).get("taxpayer") or {}
+        sp_ = (state.get("intake") or {}).get("spouse") or {}
+        prov["12d"] = record("12d", count, source_kind="chart", sources=["intake"], method="tax_math.count_12d_boxes",
+                             inputs={**dict(boxes), "taxpayer_dob": tp_.get("dob"), "spouse_dob": sp_.get("dob"), "age_test": "born before 1961-01-02"}, citations=["REF-SD-3"])
         sd = call("standard_deduction", filing_status=fs, boxes_checked=count, chart_applies=bool(elig.get("chart_applies", True)))
         put("12e", sd["amount"], source_kind="chart", sources=["12d"], method="tax_math.standard_deduction", inputs={"filing_status": fs, "boxes_checked": count, "base": sd["base"], "per_box": sd["per_box"]}, transport=last(), citations=["REF-SD-1", "REF-SD-2"])
         sr = call("senior_deduction", filing_status=fs, magi=lines["11a"], taxpayer_65=bool(boxes.get("taxpayer_65")), spouse_65=bool(boxes.get("spouse_65")))
@@ -149,14 +153,7 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
         transports = {c.transport for c in tm.calls}
         n_calls = len(tm.calls)
 
-    # ---- test hooks: faults the Review agent must catch ------------------
-    if fault.get("drop_provenance_for") and version <= int(fault.get("rounds", 1)):
-        prov.pop(fault["drop_provenance_for"], None)
-        notes.append(f"FAULT INJECTED (test): provenance for line {fault['drop_provenance_for']} dropped in version {version}")
-    if fault.get("corrupt_line") and version <= int(fault.get("rounds", 1)):
-        line, delta = fault["corrupt_line"], float(fault.get("delta", 100))
-        lines[line] = round(lines[line] + delta, 2)
-        notes.append(f"FAULT INJECTED (test): line {line} shifted by {delta} in version {version}")
+    apply_computation_faults(fault, version, lines, prov, notes)  # test-only; see faults.py
 
     return {
         "lines": lines,

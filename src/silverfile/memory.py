@@ -49,11 +49,16 @@ class ContextWindow:
     """
 
     strategy: str = "selective"
-    history: list[dict[str, str]] = field(default_factory=list)  # {"item": ..., "reply": ...}
+    history: list[dict[str, Any]] = field(default_factory=list)  # {"item": str | content blocks, "reply": str}
     decisions: list[str] = field(default_factory=list)
     max_decisions: int = 12
 
-    def messages_for(self, current_item: str) -> list[dict[str, Any]]:
+    def messages_for(self, current_item: Any) -> list[dict[str, Any]]:
+        """`current_item` is a string or a list of content blocks (text plus an image).
+
+        With no strategy the earlier items are replayed exactly as they were sent,
+        images included, because that is what a naive single thread does.
+        """
         if self.strategy == "none":
             msgs: list[dict[str, Any]] = []
             for h in self.history:
@@ -62,9 +67,13 @@ class ContextWindow:
             msgs.append({"role": "user", "content": current_item})
             return msgs
         recap = "Decisions so far: " + ("; ".join(self.decisions[-self.max_decisions :]) if self.decisions else "none yet") + "."
-        return [{"role": "user", "content": f"{recap}\n\nCurrent item:\n{current_item}"}]
+        if isinstance(current_item, str):
+            return [{"role": "user", "content": f"{recap}\n\nCurrent item:\n{current_item}"}]
+        blocks = [b for b in current_item if b.get("type") != "text"]
+        text = " ".join(b["text"] for b in current_item if b.get("type") == "text")
+        return [{"role": "user", "content": blocks + [{"type": "text", "text": f"{recap}\n\nCurrent item:\n{text}"}]}]
 
-    def remember(self, item: str, reply: str, decision: str | None = None) -> None:
+    def remember(self, item: Any, reply: str, decision: str | None = None) -> None:
         self.history.append({"item": item, "reply": reply})
         if decision:
             self.decisions.append(decision)

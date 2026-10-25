@@ -1,0 +1,14 @@
+services:
+  silverfile:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SILVERFILE_DATA_DIR: /data
+    volumes:
+      - silverfile-data:/data
+volumes:
+  silverfile-data:

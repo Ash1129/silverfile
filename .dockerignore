@@ -1,0 +1,8 @@
+.venv
+.venv.nosync
+__pycache__
+*.pyc
+.git
+data/runtime
+outputs
+.env
