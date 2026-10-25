@@ -1,0 +1,12 @@
+{
+ "kind": "1099-R",
+ "recipient_name": "Harold J Benson",
+ "payer_name": "NY State Teachers' Retirement",
+ "gross_distribution": 31200.0,
+ "taxable_amount": 31200.0,
+ "taxable_not_determined": false,
+ "federal_withheld": 2800.0,
+ "distribution_code": "7",
+ "ira_sep_simple": false,
+ "tax_year": "2025"
+}

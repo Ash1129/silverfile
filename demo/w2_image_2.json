@@ -1,0 +1,14 @@
+{
+ "kind": "W-2",
+ "employee_name": "Eleanor M Whitfield",
+ "employee_ssn_last4": "5678",
+ "employer_name": "Cornell Botanic Gardens",
+ "employer_ein": "15-9876543",
+ "wages": 6250.0,
+ "federal_withheld": 310.0,
+ "social_security_wages": 6250.0,
+ "social_security_tax": 387.5,
+ "medicare_wages": 6250.0,
+ "medicare_tax": 90.63,
+ "tax_year": "2025"
+}

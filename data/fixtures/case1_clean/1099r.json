@@ -1,0 +1,12 @@
+{
+ "kind": "1099-R",
+ "recipient_name": "Eleanor M Whitfield",
+ "payer_name": "Tompkins County Retirement System",
+ "gross_distribution": 14200.0,
+ "taxable_amount": 14200.0,
+ "taxable_not_determined": false,
+ "federal_withheld": 900.0,
+ "distribution_code": "7",
+ "ira_sep_simple": false,
+ "tax_year": "2025"
+}

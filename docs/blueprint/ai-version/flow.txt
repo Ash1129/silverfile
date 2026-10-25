@@ -1,0 +1,16 @@
+1. Preparer starts a return draft [Start, After images are uploaded, method: Manual start]. Then: step 2.
+2. Check uploads and tax year [Fixed step, Rules check on each file, method: Validation rules]. Then: step 3, step 7 (unreadable or wrong year).
+3. Sort each document by form type [Decision, Fast sorting step, model: Haiku 5.5]. Then: step 4 (W-2 wage form), step 5 (1099 income form), step 6 (retirement or SSA form), step 7 (not sure).
+4. Read W-2 wage forms [AI step, AI step with W-2 rules, model: Sonnet 5.5]. Checked against checklist. Then: step 8.
+5. Read 1099 income forms [AI step, AI step with 1099 rules, model: Sonnet 5.5]. Checked against checklist. Then: step 8.
+6. Read retirement and Social Security forms [AI step, AI step with SSA and 1099-R rules, model: Sonnet 5.5]. Checked against checklist. Then: step 8.
+7. Unclear or unreadable items [Person, Sent to a trained person]. Then: step 8.
+8. Combine figures into one return [Fixed step, Matched by taxpayer and form, method: Deterministic merge]. Then: step 9.
+9. Spouse died this year? [Decision, Field rule on date of death, method: Validation rules]. Then: step 10 (spouse died in year), step 11 (no spouse death).
+10. Spouse-death filing status sign-off [Person, Any trained Kushim employee]. Trained employee signs off filing status. Then: step 11.
+11. Apply current-year tax rules [Fixed step, Current tax tables and senior rules, method: Decision table]. Then: step 13.
+12. Look up prior-year return [Your tools, Read-only tax system lookup]. Then: step 13 (prior-year figures).
+13. Check draft against sources and rules [AI step, Checked against source images, model: Opus 5.5]. Checked against checklist. Then: step 12 (look up prior year), step 14.
+14. Preparer approves each draft [Person, Source beside each figure]. Named preparer approves each return. Then: step 15 (approved), step 11 (sent back).
+15. Save draft with source log [Fixed step, Stored in the tax software, method: Scripted action]. Then: step 16.
+16. Draft ready for filing review [Finish, Logged and kept].

@@ -1,0 +1,12 @@
+{
+ "kind": "1099-R",
+ "recipient_name": "Samuel Ortega",
+ "payer_name": "Acme Annuity Co",
+ "gross_distribution": 14000.0,
+ "taxable_amount": null,
+ "taxable_not_determined": true,
+ "federal_withheld": 0.0,
+ "distribution_code": "7",
+ "ira_sep_simple": false,
+ "tax_year": "2025"
+}

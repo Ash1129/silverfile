@@ -1,0 +1,10 @@
+pyproject.toml
+src/silverfile/__init__.py
+src/silverfile.egg-info/PKG-INFO
+src/silverfile.egg-info/SOURCES.txt
+src/silverfile.egg-info/dependency_links.txt
+src/silverfile.egg-info/top_level.txt
+src/silverfile/tax_math/__init__.py
+src/silverfile/tax_math/client.py
+src/silverfile/tax_math/rules.py
+src/silverfile/tax_math/server.py

@@ -1,0 +1,11 @@
+{
+  "name": "prepare-draft-form-1040-sr-returns-with-source-p",
+  "version": "0.1.0",
+  "description": "Prepare draft Form 1040-SR returns with source provenance for human review: An automated workflow with AI steps. No agent needed.",
+  "author": {
+    "name": "Agent Architecture Guide"
+  },
+  "keywords": [
+    "agent-architecture-guide"
+  ]
+}

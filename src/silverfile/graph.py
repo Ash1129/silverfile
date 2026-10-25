@@ -1,0 +1,103 @@
+"""The SilverFile graph: an orchestrator hub with six agent spokes.
+
+Topology (hub and spoke with one fan-out):
+  START -> orchestrator -+-> intake ------------------+
+                         +-> extract_document (xN) -> aggregate_extraction -+
+                         +-> eligibility ------------+
+                         +-> computation ------------+---> orchestrator (again)
+                         +-> review -----------------+
+                         +-> escalation (interrupt) -+
+                         +-> finalize -> END
+
+Why this topology: the brief's business rule is six distinct agents that may not
+be merged, with an orchestrator that decides who acts next and owns
+termination. A hub makes every handoff explicit (and loggable for the loop
+guard), keeps the review->revise cycle a real cycle through the hub, and lets
+the fan-out for extraction be the one genuine parallel branch with an
+aggregation step and a reducer (`merge_documents`).
+"""
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.graph import END, START, StateGraph
+
+from .agents.computation import run_computation
+from .agents.eligibility import run_eligibility
+from .agents.escalation import escalation_node
+from .agents.extraction import aggregate_extraction_node, extract_document_node
+from .agents.intake import run_intake
+from .agents.orchestrator import orchestrator_node, route
+from .agents.review import run_review
+from .config import settings
+from .provenance import now_iso
+from .state import ReturnState
+
+
+def finalize_node(state: ReturnState) -> dict[str, Any]:
+    if state.get("halted_reason") or state.get("loop_guard_tripped"):
+        return {"status": "halted", "handoffs": ["finalize"], "events": [f"finalize: halted ({state.get('halted_reason') or 'loop guard'})"]}
+    elig = state.get("eligibility") or {}
+    if not elig.get("eligible_1040sr") or not elig.get("in_scope") or not elig.get("chart_applies", True):
+        return {"status": "halted", "halted_reason": "not eligible or out of scope; a Kushim preparer takes it from here", "handoffs": ["finalize"], "events": ["finalize: halted (eligibility/scope)"]}
+    return {"status": "complete", "handoffs": ["finalize"], "events": [f"finalize: draft complete at {now_iso()} after {state.get('review_round', 0)} review round(s)"]}
+
+
+def build_graph():
+    g = StateGraph(ReturnState)
+    g.add_node("orchestrator", orchestrator_node)
+    g.add_node("intake", run_intake)
+    g.add_node("extract_document", extract_document_node)
+    g.add_node("aggregate_extraction", aggregate_extraction_node)
+    g.add_node("eligibility", run_eligibility)
+    g.add_node("computation", run_computation)
+    g.add_node("review", run_review)
+    g.add_node("escalation", escalation_node)
+    g.add_node("finalize", finalize_node)
+
+    g.add_edge(START, "orchestrator")
+    g.add_conditional_edges("orchestrator", route, ["intake", "extract_document", "aggregate_extraction", "eligibility", "computation", "review", "escalation", "finalize", "orchestrator"])
+    g.add_edge("extract_document", "aggregate_extraction")
+    for spoke in ("intake", "aggregate_extraction", "eligibility", "computation", "review", "escalation"):
+        g.add_edge(spoke, "orchestrator")
+    g.add_edge("finalize", END)
+    return g
+
+
+_compiled: dict[str, Any] = {}
+
+
+def get_checkpointer(path: str | Path | None = None):
+    if path is None:
+        path = settings().checkpoint_db
+    if str(path) == ":memory:":
+        return InMemorySaver()
+    conn = sqlite3.connect(str(path), check_same_thread=False)
+    return SqliteSaver(conn)
+
+
+def compile_graph(checkpointer=None):
+    """Compile with a checkpointer (SQLite by default) so interrupts and resumes work."""
+    cp = checkpointer if checkpointer is not None else get_checkpointer()
+    return build_graph().compile(checkpointer=cp)
+
+
+def app(path: str | Path | None = None):
+    key = str(path or settings().checkpoint_db)
+    if key not in _compiled:
+        _compiled[key] = compile_graph(get_checkpointer(path))
+    return _compiled[key]
+
+
+def new_return_state(return_id: str, documents: list[dict[str, Any]] | None = None, fault_injection: dict[str, Any] | None = None, intake: dict[str, Any] | None = None) -> dict[str, Any]:
+    return {
+        "return_id": return_id, "tax_year": 2025, "created_at": now_iso(), "status": "new",
+        "intake": intake or {}, "intake_complete": bool(intake and intake.get("_confirmed")),
+        "documents_in": documents or [], "extraction_done": False, "lines": {}, "provenance": {}, "computation_version": 0,
+        "review_round": 0, "review_passed": False, "revise_target": None, "loop_guard_tripped": False, "fault_injection": fault_injection or {},
+        "handoffs": [], "events": [f"return {return_id} created"],
+    }

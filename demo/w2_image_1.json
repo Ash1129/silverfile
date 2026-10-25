@@ -1,0 +1,14 @@
+{
+ "kind": "W-2",
+ "employee_name": "Eleanor M Whitfield",
+ "employee_ssn_last4": "5678",
+ "employer_name": "Tompkins Public Library",
+ "employer_ein": "16-1234567",
+ "wages": 18400.0,
+ "federal_withheld": 1210.0,
+ "social_security_wages": 18400.0,
+ "social_security_tax": 1140.8,
+ "medicare_wages": 18400.0,
+ "medicare_tax": 266.8,
+ "tax_year": "2025"
+}

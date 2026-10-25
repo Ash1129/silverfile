@@ -1,0 +1,12 @@
+.venv
+.venv.nosync
+__pycache__/
+*.pyc
+.env
+*.sqlite
+*.sqlite-journal
+data/runtime/
+traces/*.jsonl
+outputs/
+.pytest_cache/
+.DS_Store

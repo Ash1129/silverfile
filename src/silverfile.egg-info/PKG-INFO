@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: silverfile
+Version: 0.1.0
+Summary: SilverFile: a multi-agent preparation aid for Form 1040-SR drafts (Kushim proof of concept).
+Requires-Python: >=3.11

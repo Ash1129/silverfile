@@ -1,0 +1,239 @@
+{
+ "variant": "recommended",
+ "title": "An automated workflow with AI steps. No agent needed.",
+ "tool": "Claude",
+ "summary": "A fixed workflow in Claude. AI handles only the steps that need judgement.",
+ "stages": 5,
+ "tracks": 3,
+ "nodes": [
+  {
+   "id": "start",
+   "kind": "start",
+   "engine": {
+    "kind": "algorithm",
+    "name": "Manual start",
+    "short": "Manual start",
+    "how": "Runs only when a person starts it."
+   },
+   "name": "You start it",
+   "label": "In Claude",
+   "what": "You hand the task over when you need it. Nothing runs on its own.",
+   "why": "You said you'll start it yourself.",
+   "passes": "The new item, plus any context the next step needs.",
+   "rules": [
+    "TL3"
+   ],
+   "stage": 0,
+   "tracks": [
+    0,
+    2
+   ],
+   "gates": [],
+   "step": 1
+  },
+  {
+   "id": "router",
+   "kind": "decision",
+   "engine": {
+    "kind": "model",
+    "model": "sonnet",
+    "role": "router",
+    "name": "Claude Sonnet 5.5",
+    "short": "Sonnet 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Sonnet 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "Sorting is a simple classification. A fast, balanced model is enough; a smaller one can be tested later.",
+    "alternative": "Open-weight alternative: for example a smaller model from the same open families, chosen by testing."
+   },
+   "name": "Sort by type",
+   "label": "Small, fast model",
+   "what": "A quick AI step reads each item and decides which type it is, so it can go down the right path.",
+   "why": "You said the work arrives in a few distinct types. Sorting first lets each type get its own simpler instructions and tools.",
+   "passes": "The item, labelled with its type, to that type's path.",
+   "rules": [
+    "T3",
+    "M7"
+   ],
+   "stage": 1,
+   "tracks": [
+    0,
+    2
+   ],
+   "gates": [],
+   "step": 2
+  },
+  {
+   "id": "typeA",
+   "kind": "ai",
+   "engine": {
+    "kind": "model",
+    "model": "sonnet",
+    "role": "worker",
+    "name": "Claude Sonnet 5.5",
+    "short": "Sonnet 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Sonnet 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "A balanced model handles most judgement steps well at a reasonable cost per run.",
+    "alternative": "Open-weight alternative: for example Kimi K2.6, GLM-5 or DeepSeek-V4-Pro (leading open-weight models in October 2026)."
+   },
+   "name": "Most common type",
+   "label": "Claude with your Skill",
+   "gates": [
+    {
+     "kind": "stop",
+     "text": "Checked against checklist"
+    }
+   ],
+   "what": "This path has its own instructions and tools for the most frequent type of request. It follows the steps in your Skill. It draws on your reference library rather than guessing.",
+   "why": "Instructions written for one type are simpler and more reliable than one set that tries to cover everything.",
+   "passes": "A finished draft for this type.",
+   "rules": [
+    "T3",
+    "T11"
+   ],
+   "stage": 2,
+   "tracks": [
+    0,
+    0
+   ],
+   "step": 3
+  },
+  {
+   "id": "typeB",
+   "kind": "ai",
+   "engine": {
+    "kind": "model",
+    "model": "sonnet",
+    "role": "worker",
+    "name": "Claude Sonnet 5.5",
+    "short": "Sonnet 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Sonnet 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "A balanced model handles most judgement steps well at a reasonable cost per run.",
+    "alternative": "Open-weight alternative: for example Kimi K2.6, GLM-5 or DeepSeek-V4-Pro (leading open-weight models in October 2026)."
+   },
+   "name": "Other known types",
+   "label": "Claude with your Skill",
+   "gates": [
+    {
+     "kind": "stop",
+     "text": "Checked against checklist"
+    }
+   ],
+   "what": "Each other known type gets its own path like this one, with instructions tuned to it. It draws on your reference library rather than guessing.",
+   "why": "Separate paths can be tested and improved one at a time.",
+   "passes": "A finished draft for this type.",
+   "rules": [
+    "T3"
+   ],
+   "stage": 2,
+   "tracks": [
+    1,
+    1
+   ],
+   "step": 4
+  },
+  {
+   "id": "unclear",
+   "kind": "human",
+   "name": "Unclear items",
+   "label": "Sent to a person",
+   "what": "Anything the sorting step isn't confident about goes straight to a person instead of being guessed.",
+   "why": "Misrouted items are the most common failure in this pattern. A safe default path prevents it.",
+   "passes": "The person's answer, straight to the finish.",
+   "rules": [
+    "T3"
+   ],
+   "stage": 2,
+   "tracks": [
+    2,
+    2
+   ],
+   "gates": [],
+   "step": 5
+  },
+  {
+   "id": "approve",
+   "kind": "human",
+   "name": "You approve each result",
+   "label": "Before anything goes out",
+   "gates": [],
+   "what": "A named person reviews every result with the checklist beside the source material and any item marked insufficient evidence, one case at a time, and approves it, changes it or sends it back. No batch approval.",
+   "why": "Autonomy starts at level 2. You explicitly require approval before release or action. High volume does not waive that requirement.",
+   "passes": "Approved results only. Rejected ones go back with a note, and become test examples.",
+   "rules": [
+    "AU1",
+    "AU11"
+   ],
+   "stage": 3,
+   "tracks": [
+    0,
+    1
+   ],
+   "step": 6
+  },
+  {
+   "id": "end",
+   "kind": "end",
+   "name": "Result is ready",
+   "label": "Delivered output",
+   "gates": [],
+   "what": "The finished result is delivered to whoever needs it.",
+   "why": "This is the outcome the task exists to produce. Every run, and every failure, should be logged so you can review it.",
+   "passes": "Nothing further. Logged results become new test examples over time.",
+   "rules": [
+    "AU9"
+   ],
+   "stage": 4,
+   "tracks": [
+    0,
+    2
+   ],
+   "step": 7
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "router",
+   "style": "flow"
+  },
+  {
+   "from": "router",
+   "to": "typeA",
+   "style": "flow"
+  },
+  {
+   "from": "router",
+   "to": "typeB",
+   "style": "flow"
+  },
+  {
+   "from": "router",
+   "to": "unclear",
+   "label": "not sure",
+   "style": "flow"
+  },
+  {
+   "from": "typeA",
+   "to": "approve",
+   "style": "flow"
+  },
+  {
+   "from": "typeB",
+   "to": "approve",
+   "style": "flow"
+  },
+  {
+   "from": "approve",
+   "to": "end",
+   "label": "approved",
+   "style": "flow"
+  },
+  {
+   "from": "unclear",
+   "to": "end",
+   "style": "flow"
+  }
+ ],
+ "captions": {
+  "2": "One path per type"
+ }
+}

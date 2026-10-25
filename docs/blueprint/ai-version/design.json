@@ -1,0 +1,634 @@
+{
+ "variant": "recommended",
+ "title": "Draft Form 1040-SR with source links, reviewed by a person",
+ "tool": "n8n",
+ "summary": "A fixed workflow in n8n. AI handles only the steps that need judgement.",
+ "stages": 12,
+ "tracks": 4,
+ "nodes": [
+  {
+   "id": "start",
+   "step": 1,
+   "stage": 0,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "start",
+   "name": "Preparer starts a return draft",
+   "label": "After images are uploaded",
+   "gates": [],
+   "engine": {
+    "kind": "algorithm",
+    "name": "Manual start",
+    "short": "Manual start",
+    "how": "Runs only when a person starts it."
+   },
+   "what": "A preparer starts a draft for one taxpayer's current-year return once the W-2 and 1099 images are uploaded through intake. Nothing runs on its own.",
+   "why": "You said you start it yourself, and each run covers one return.",
+   "passes": "One taxpayer's uploaded images and intake answers, with the tax year.",
+   "rules": [
+    "AI"
+   ],
+   "kb": []
+  },
+  {
+   "id": "intake-check",
+   "step": 2,
+   "stage": 1,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "fixed",
+   "name": "Check uploads and tax year",
+   "label": "Rules check on each file",
+   "gates": [],
+   "engine": {
+    "kind": "algorithm",
+    "name": "Validation rules",
+    "short": "Validation rules",
+    "how": "Schema, required-field and pattern (regex) checks on the output."
+   },
+   "what": "Checks that each uploaded image is readable, is a supported form type, belongs to the current tax year and shows the taxpayer's name and ID. Each accepted file gets a record ID so every figure can be traced back to it.",
+   "why": "Bad inputs caught here never reach the figures. Unreadable or wrong-year files go to a person rather than being guessed at.",
+   "passes": "Accepted files, each with a record ID. Failed files go to a person with the reason.",
+   "rules": [],
+   "kb": []
+  },
+  {
+   "id": "router",
+   "step": 3,
+   "stage": 2,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "decision",
+   "name": "Sort each document by form type",
+   "label": "Fast sorting step",
+   "gates": [],
+   "engine": {
+    "kind": "model",
+    "model": "haiku",
+    "role": "router",
+    "name": "Claude Haiku 5.5",
+    "short": "Haiku 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Haiku 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "Chosen by AI for this step, weighing quality, cost and speed (the guide's starting pick is Claude Sonnet 5.5). Sorting is a simple classification. A fast, balanced model is enough; a smaller one can be tested later.",
+    "alternative": "Open-weight alternative: for example a smaller model from the same open families, chosen by testing."
+   },
+   "what": "Reads each accepted image and labels it as a W-2, a 1099 income form (INT, DIV, B, NEC or MISC), a retirement or Social Security form (1099-R or SSA-1099), or not sure. Clear cases go to their own extraction path. Uncertain ones go to a person.",
+   "why": "Each form type has different boxes and rules, so separate paths are more accurate. Sorting is simple work that a small, fast model does well, which keeps the cost down.",
+   "passes": "Each file labelled with its form type and record ID.",
+   "rules": [
+    "T3",
+    "M7"
+   ],
+   "kb": [
+    {
+     "id": "P01",
+     "title": "The five workflow patterns and the single-agent loop"
+    },
+    {
+     "id": "M02",
+     "title": "Cutting cost without losing quality"
+    }
+   ]
+  },
+  {
+   "id": "wages",
+   "step": 4,
+   "stage": 3,
+   "tracks": [
+    0,
+    0
+   ],
+   "kind": "ai",
+   "name": "Read W-2 wage forms",
+   "label": "AI step with W-2 rules",
+   "gates": [
+    {
+     "kind": "stop",
+     "text": "Checked against checklist"
+    }
+   ],
+   "engine": {
+    "kind": "model",
+    "model": "sonnet",
+    "role": "worker",
+    "name": "Claude Sonnet 5.5",
+    "short": "Sonnet 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Sonnet 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "A balanced model handles most judgement steps well at a reasonable cost per run.",
+    "alternative": "Open-weight alternative: for example Kimi K2.6, GLM-5 or DeepSeek-V4-Pro (leading open-weight models in October 2026)."
+   },
+   "what": "Reads each W-2 and records the wage, withholding, Social Security, Medicare and state boxes. Each value is tied to its record ID and box so a reviewer can find it on the image. Anything unreadable is marked insufficient evidence, not estimated.",
+   "why": "Instructions written for one form type are more reliable than one set for all forms. Source-linked values let the reviewer check each figure against the image.",
+   "passes": "Wage figures, each with its record ID and box reference.",
+   "rules": [],
+   "kb": [
+    {
+     "id": "N01",
+     "title": "n8n data contracts, item linking and reusable workflows"
+    },
+    {
+     "id": "T06",
+     "title": "System prompts and managing what the agent sees"
+    }
+   ]
+  },
+  {
+   "id": "invest",
+   "step": 5,
+   "stage": 3,
+   "tracks": [
+    1,
+    1
+   ],
+   "kind": "ai",
+   "name": "Read 1099 income forms",
+   "label": "AI step with 1099 rules",
+   "gates": [
+    {
+     "kind": "stop",
+     "text": "Checked against checklist"
+    }
+   ],
+   "engine": {
+    "kind": "model",
+    "model": "sonnet",
+    "role": "worker",
+    "name": "Claude Sonnet 5.5",
+    "short": "Sonnet 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Sonnet 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "A balanced model handles most judgement steps well at a reasonable cost per run.",
+    "alternative": "Open-weight alternative: for example Kimi K2.6, GLM-5 or DeepSeek-V4-Pro (leading open-weight models in October 2026)."
+   },
+   "what": "Reads each 1099-INT, DIV, B, NEC and MISC form and records interest, dividends, sales proceeds, and other income boxes. Each value keeps its record ID and box reference. Anything unreadable is marked insufficient evidence, not estimated.",
+   "why": "Each 1099 type reports different boxes, so one focused set of instructions is more reliable. Linking every value to its box lets the reviewer verify it quickly.",
+   "passes": "1099 income figures, each with its record ID and box reference.",
+   "rules": [],
+   "kb": [
+    {
+     "id": "N01",
+     "title": "n8n data contracts, item linking and reusable workflows"
+    },
+    {
+     "id": "T06",
+     "title": "System prompts and managing what the agent sees"
+    }
+   ]
+  },
+  {
+   "id": "retire",
+   "step": 6,
+   "stage": 3,
+   "tracks": [
+    2,
+    2
+   ],
+   "kind": "ai",
+   "name": "Read retirement and Social Security forms",
+   "label": "AI step with SSA and 1099-R rules",
+   "gates": [
+    {
+     "kind": "stop",
+     "text": "Checked against checklist"
+    }
+   ],
+   "engine": {
+    "kind": "model",
+    "model": "sonnet",
+    "role": "worker",
+    "name": "Claude Sonnet 5.5",
+    "short": "Sonnet 5.5",
+    "prototype": "Build the first version on Claude Opus 5.5. Switch to Claude Sonnet 5.5 once it matches that baseline on your test examples. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "A balanced model handles most judgement steps well at a reasonable cost per run.",
+    "alternative": "Open-weight alternative: for example Kimi K2.6, GLM-5 or DeepSeek-V4-Pro (leading open-weight models in October 2026)."
+   },
+   "what": "Reads each SSA-1099 and 1099-R and records the benefit, distribution, taxable amount and withholding boxes exactly as printed. It does not work out taxable benefits; that happens in the tax step. Unreadable boxes are marked insufficient evidence.",
+   "why": "Senior taxpayers often have these forms, and the figures feed directly into how much of the benefit is taxable. Keeping the printed values separate from the calculation makes errors easier to find.",
+   "passes": "Retirement and Social Security figures, each with its record ID and box reference.",
+   "rules": [],
+   "kb": [
+    {
+     "id": "N01",
+     "title": "n8n data contracts, item linking and reusable workflows"
+    },
+    {
+     "id": "T06",
+     "title": "System prompts and managing what the agent sees"
+    }
+   ]
+  },
+  {
+   "id": "unclear",
+   "step": 7,
+   "stage": 3,
+   "tracks": [
+    3,
+    3
+   ],
+   "kind": "human",
+   "name": "Unclear or unreadable items",
+   "label": "Sent to a trained person",
+   "gates": [],
+   "what": "Files the intake check or the sorting step cannot handle with confidence go to a trained preparer. The preparer identifies the form, or asks the taxpayer for a clean copy. The answer is recorded against the record ID before the run continues.",
+   "why": "A misread form is worse than a delayed one, and automated output that looks clean is easy to over-trust. A person decides these cases.",
+   "passes": "The identified form type, or a request for a new upload, with the record ID.",
+   "rules": [
+    "T3"
+   ],
+   "kb": [
+    {
+     "id": "A02",
+     "title": "When a person must step in, and how to keep the off-switch"
+    },
+    {
+     "id": "A03",
+     "title": "The approval trap - people over-trust automated output"
+    }
+   ]
+  },
+  {
+   "id": "merge",
+   "step": 8,
+   "stage": 4,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "fixed",
+   "name": "Combine figures into one return",
+   "label": "Matched by taxpayer and form",
+   "gates": [],
+   "engine": {
+    "kind": "algorithm",
+    "name": "Deterministic merge",
+    "short": "Deterministic merge",
+    "how": "Joins the parts in a fixed order and removes duplicates. No judgement involved."
+   },
+   "what": "Joins all extracted figures into one return record, matched by taxpayer ID and tax year. Each field keeps its source record and box. Duplicate forms, or conflicting values for the same box, are flagged rather than overwritten.",
+   "why": "One record lets the later checks run on the whole return. Without flagged conflicts, a duplicate or clash could be dropped silently.",
+   "passes": "One return record, with a source for each field and any conflicts flagged.",
+   "rules": [],
+   "kb": []
+  },
+  {
+   "id": "spouse-check",
+   "step": 9,
+   "stage": 5,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "decision",
+   "name": "Spouse died this year?",
+   "label": "Field rule on date of death",
+   "gates": [],
+   "engine": {
+    "kind": "algorithm",
+    "name": "Validation rules",
+    "short": "Validation rules",
+    "how": "Schema, required-field and pattern (regex) checks on the output."
+   },
+   "what": "Checks the intake answers and the documents for a spouse who died in the tax year. A yes sends the return to a trained person before filing status and tax are set. A no moves straight on.",
+   "why": "A spouse's death changes filing status, and a high-stakes choice like this should go to a person rather than be defaulted by automation. A fixed rule keeps the trigger repeatable.",
+   "passes": "The return record, with a flag if a pause is needed.",
+   "rules": [],
+   "kb": [
+    {
+     "id": "A02",
+     "title": "When a person must step in, and how to keep the off-switch"
+    }
+   ]
+  },
+  {
+   "id": "spouse-pause",
+   "step": 10,
+   "stage": 6,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "human",
+   "name": "Spouse-death filing status sign-off",
+   "label": "Any trained Kushim employee",
+   "gates": [
+    {
+     "kind": "human",
+     "text": "Trained employee signs off filing status"
+    }
+   ],
+   "what": "A trained employee checks the spouse's date of death, the filing status options and the joint or surviving-spouse rules that may apply. They record the status chosen and the reason. Any trained staff member may sign off.",
+   "why": "A filing status error changes the whole return and the taxpayer's tax. A named, trained person makes the call so it is not left to automated output.",
+   "passes": "The signed-off filing status and reason, with the signer's name.",
+   "rules": [],
+   "kb": [
+    {
+     "id": "A02",
+     "title": "When a person must step in, and how to keep the off-switch"
+    },
+    {
+     "id": "A03",
+     "title": "The approval trap - people over-trust automated output"
+    }
+   ]
+  },
+  {
+   "id": "calc",
+   "step": 11,
+   "stage": 7,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "fixed",
+   "name": "Apply current-year tax rules",
+   "label": "Current tax tables and senior rules",
+   "gates": [],
+   "engine": {
+    "kind": "algorithm",
+    "name": "Decision table",
+    "short": "Decision table",
+    "how": "Each rule is a row of conditions and an action. The first row that matches decides."
+   },
+   "what": "Applies the current-year tax tables, the filing status, the standard deduction for taxpayers 65 or older and the senior deduction rules to the merged return record. Each figure shows the rule row it came from.",
+   "why": "Tax tables are fixed rules, so a lookup table gives repeatable, auditable results. The rule row shown lets a reviewer check each figure against the published table.",
+   "passes": "Draft 1040-SR figures, each with the rule used.",
+   "rules": [],
+   "kb": []
+  },
+  {
+   "id": "tool",
+   "step": 12,
+   "stage": 8,
+   "tracks": [
+    0,
+    1
+   ],
+   "kind": "tool",
+   "name": "Look up prior-year return",
+   "label": "Read-only tax system lookup",
+   "gates": [],
+   "what": "Reads the taxpayer's prior-year return and client file from the firm's tax software, read-only. It is used only for the prior-year fields the checker names, to spot large unexplained changes.",
+   "why": "Prior-year figures are a useful cross-check. Read-only access means the lookup cannot change any client record.",
+   "passes": "Prior-year values for the named fields.",
+   "rules": [],
+   "kb": []
+  },
+  {
+   "id": "checker",
+   "step": 13,
+   "stage": 8,
+   "tracks": [
+    2,
+    3
+   ],
+   "kind": "ai",
+   "name": "Check draft against sources and rules",
+   "label": "Checked against source images",
+   "gates": [
+    {
+     "kind": "stop",
+     "text": "Checked against checklist"
+    }
+   ],
+   "engine": {
+    "kind": "model",
+    "model": "opus",
+    "role": "checker",
+    "name": "Claude Opus 5.5",
+    "short": "Opus 5.5",
+    "prototype": "Build on Claude Opus 5.5 and keep it there: this step needs the strongest model in the design. If Claude Opus 5.5 itself falls short on the hardest steps, try Claude Fable 5.1; it requires Anthropic to keep data for 30 days, so it is unavailable under zero data retention.",
+    "why": "Checking against a clear checklist is narrower than producing the work. Fixed checks (quotes match the source, every item addressed) run first. Mistakes here would be visible or costly, so the checker gets a stronger model.",
+    "alternative": "Open-weight alternative: for example a smaller model from the same open families, chosen by testing."
+   },
+   "what": "Compares each draft figure with its source image and record, checks totals and consistency across forms, and flags anything missing or contradictory as insufficient evidence. It may request prior-year figures through the lookup step, but it cannot change a figure.",
+   "why": "A checker that has the source documents to check against catches errors. Without a real reference, a second reading adds cost but little reliability, so the source documents are the reference.",
+   "passes": "The draft with each figure marked verified, flagged or insufficient evidence.",
+   "rules": [],
+   "kb": [
+    {
+     "id": "P02",
+     "title": "Voting, checking and self-correction - what the research shows"
+    },
+    {
+     "id": "O01",
+     "title": "Repeatable AI evaluations with Promptfoo"
+    }
+   ]
+  },
+  {
+   "id": "approve",
+   "step": 14,
+   "stage": 9,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "human",
+   "name": "Preparer approves each draft",
+   "label": "Source beside each figure",
+   "gates": [
+    {
+     "kind": "human",
+     "text": "Named preparer approves each return"
+    }
+   ],
+   "what": "A named preparer reviews each draft one return at a time, with the checker's flags and the source images beside each figure. They approve it, change it, or send it back to the tax step. Nothing is approved in batches.",
+   "why": "Every draft needs approval before it goes anywhere. Bulk or rushed approvals become rubber stamps, so each one is named and tied to its sources.",
+   "passes": "The approved draft with the approver's name, or the return with a note for the tax step.",
+   "rules": [
+    "AI",
+    "AU5",
+    "AU11"
+   ],
+   "kb": [
+    {
+     "id": "A03",
+     "title": "The approval trap - people over-trust automated output"
+    },
+    {
+     "id": "A04",
+     "title": "Earning more autonomy over time"
+    },
+    {
+     "id": "A02",
+     "title": "When a person must step in, and how to keep the off-switch"
+    }
+   ]
+  },
+  {
+   "id": "save",
+   "step": 15,
+   "stage": 10,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "fixed",
+   "name": "Save draft with source log",
+   "label": "Stored in the tax software",
+   "gates": [],
+   "engine": {
+    "kind": "algorithm",
+    "name": "Scripted action",
+    "short": "Scripted action",
+    "how": "A fixed sequence of API calls with set inputs. Same input, same result."
+   },
+   "what": "Writes the approved draft to the firm's tax software as a draft. It stores every figure's source record, the checker's flags, the approver's name and the run log. Nothing is filed or sent to the taxpayer.",
+   "why": "Keeping the source links and approval together lets anyone later see how a figure was reached. Filing stays a separate human step.",
+   "passes": "The stored draft and its log reference.",
+   "rules": [],
+   "kb": []
+  },
+  {
+   "id": "end",
+   "step": 16,
+   "stage": 11,
+   "tracks": [
+    0,
+    3
+   ],
+   "kind": "end",
+   "name": "Draft ready for filing review",
+   "label": "Logged and kept",
+   "gates": [],
+   "what": "The draft is stored for the preparer's filing decision. Every run and failure is logged so you can review them and add them to the test set.",
+   "why": "The outcome is a draft that can be reviewed. Logs and sent-back cases show where the workflow needs work.",
+   "passes": "Nothing further.",
+   "rules": [
+    "AU9"
+   ],
+   "kb": []
+  }
+ ],
+ "edges": [
+  {
+   "from": "start",
+   "to": "intake-check",
+   "style": "flow"
+  },
+  {
+   "from": "intake-check",
+   "to": "router",
+   "style": "flow"
+  },
+  {
+   "from": "intake-check",
+   "to": "unclear",
+   "label": "unreadable or wrong year",
+   "style": "flow"
+  },
+  {
+   "from": "router",
+   "to": "wages",
+   "label": "W-2 wage form",
+   "style": "assign"
+  },
+  {
+   "from": "router",
+   "to": "invest",
+   "label": "1099 income form",
+   "style": "assign"
+  },
+  {
+   "from": "router",
+   "to": "retire",
+   "label": "retirement or SSA form",
+   "style": "assign"
+  },
+  {
+   "from": "router",
+   "to": "unclear",
+   "label": "not sure",
+   "style": "flow"
+  },
+  {
+   "from": "wages",
+   "to": "merge",
+   "style": "flow"
+  },
+  {
+   "from": "invest",
+   "to": "merge",
+   "style": "flow"
+  },
+  {
+   "from": "retire",
+   "to": "merge",
+   "style": "flow"
+  },
+  {
+   "from": "unclear",
+   "to": "merge",
+   "style": "flow"
+  },
+  {
+   "from": "merge",
+   "to": "spouse-check",
+   "style": "flow"
+  },
+  {
+   "from": "spouse-check",
+   "to": "spouse-pause",
+   "label": "spouse died in year",
+   "style": "flow"
+  },
+  {
+   "from": "spouse-check",
+   "to": "calc",
+   "label": "no spouse death",
+   "style": "flow"
+  },
+  {
+   "from": "spouse-pause",
+   "to": "calc",
+   "style": "flow"
+  },
+  {
+   "from": "calc",
+   "to": "checker",
+   "style": "flow"
+  },
+  {
+   "from": "checker",
+   "to": "tool",
+   "label": "look up prior year",
+   "style": "flow"
+  },
+  {
+   "from": "tool",
+   "to": "checker",
+   "label": "prior-year figures",
+   "style": "loop"
+  },
+  {
+   "from": "checker",
+   "to": "approve",
+   "style": "flow"
+  },
+  {
+   "from": "approve",
+   "to": "save",
+   "label": "approved",
+   "style": "flow"
+  },
+  {
+   "from": "approve",
+   "to": "calc",
+   "label": "sent back",
+   "style": "loop"
+  },
+  {
+   "from": "save",
+   "to": "end",
+   "style": "flow"
+  }
+ ],
+ "captions": {
+  "3": "One path per type"
+ }
+}

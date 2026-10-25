@@ -1,0 +1,7 @@
+1. You start it [Start, In Claude, method: Manual start]. Then: step 2.
+2. Sort by type [Decision, Small, fast model, model: Sonnet 5.5]. Then: step 3, step 4, step 5 (not sure).
+3. Most common type [AI step, Claude with your Skill, model: Sonnet 5.5]. Checked against checklist. Then: step 6.
+4. Other known types [AI step, Claude with your Skill, model: Sonnet 5.5]. Checked against checklist. Then: step 6.
+5. Unclear items [Person, Sent to a person]. Then: step 7.
+6. You approve each result [Person, Before anything goes out]. Then: step 7 (approved).
+7. Result is ready [Finish, Delivered output].

@@ -1,0 +1,8 @@
+{
+ "kind": "W-2",
+ "employee_name": "Eleanor M Whitfield",
+ "employer_name": "Employer 1 Inc",
+ "wages": 10000,
+ "federal_withheld": 600,
+ "tax_year": "2025"
+}

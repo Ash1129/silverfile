@@ -1,0 +1,12 @@
+[
+ {
+  "id": "n8n",
+  "name": "n8n workflow",
+  "how": "Open a new workflow in n8n and press Cmd+V (Ctrl+V on Windows). Then add your credentials to the highlighted nodes.",
+  "action": {
+   "kind": "copy",
+   "label": "Copy for n8n",
+   "path": "n8n/workflow.json"
+  }
+ }
+]

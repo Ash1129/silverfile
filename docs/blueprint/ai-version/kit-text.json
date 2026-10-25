@@ -1,0 +1,83 @@
+{
+ "context": "Kushim is a tax preparation firm. This workflow drafts each taxpayer's current-year Form 1040-SR from uploaded W-2, 1099 and SSA-1099 images, traces every figure to its source image, and holds the draft for a named preparer to approve. Nothing is filed or sent to the taxpayer.",
+ "rules": [
+  "Report only figures printed on the document. Never estimate, infer or fill a box from memory or from another form. Unreadable or blank boxes are 'insufficient evidence' with a reason.",
+  "Every figure carries its record ID and box label exactly as printed on the form.",
+  "Extraction steps do not total, net or compute taxable amounts. Those belong to the tax rules step.",
+  "Show only the last four digits of any SSN or employer ID.",
+  "If a form's tax year is not the current year, flag it and do not use its figures.",
+  "The checker may flag a figure but never changes it. Flags name the field, record ID, box and the reason.",
+  "Never set or suggest a filing status for a return where a spouse may have died in the year. Route it to the spouse-death pause.",
+  "When unsure whether a form is a W-2, 1099 or SSA-1099, say so and route it to a person. Do not guess."
+ ],
+ "output": "Return one block per form, in this layout, then a single flag list for the return.\n\n| Record | Form | Field (box) | Value | Status |\n| --- | --- | --- | --- | --- |\n| R-0412 | W-2 | Wages (box 1) | 48,310.00 | read |\n| R-0412 | W-2 | Federal tax withheld (box 2) | insufficient evidence: box blurred | needs clean copy |\n\nFlag list example:\n- FLAG | R-0412 box 1 | Two W-2s from the same employer show different wages | severity: high | preparer to check both images\n\nAll values are as printed. Nothing is rounded or summed in this output.",
+ "skillDescription": "Use when drafting or checking a current-year Form 1040-SR from uploaded W-2, 1099 or SSA-1099 images, to read, sort and trace each figure to its source for preparer review.",
+ "overview": "A preparer uploads nothing themselves. The taxpayer's W-2, 1099 and SSA-1099 images arrive through intake, and the preparer starts a draft for one return at a time. The system checks each image, sorts it by form type, reads the figures with record IDs and box references, and asks a person about anything unclear. It merges everything into one return, pauses for a trained staff member if a spouse died in the year, applies the current-year rules, and has a checker compare the draft with its sources. The preparer then reviews that return alone, with the source image beside each figure, and approves, changes or sends it back. The approved draft is saved in the tax software with its source log. Filing stays with the preparer.",
+ "ownerAsks": [
+  "Which tax software do you use, and does it offer an API or import for drafts, or will drafts be entered another way?",
+  "Who are the trained staff allowed to sign off the spouse-death pause, and is there a list to check against?",
+  "How long must uploaded images and draft records be kept, and where may they be stored?",
+  "What should happen to a return with insufficient evidence: hold it until a clean copy arrives, or let the preparer decide per item?",
+  "Does the intake form ask whether a spouse died during the year, and is the answer stored in a field the workflow can read?"
+ ],
+ "watchOut": [
+  {
+   "title": "A checker with nothing outside to check against adds little",
+   "body": "A second AI pass that rereads the same extracted numbers is weak evidence. The checker must compare each figure with its source record, box and rule row, and a preparer approves every return. Treat a 'no issues' result as weak, not as proof.",
+   "kb": [
+    "P02",
+    "G04"
+   ]
+  },
+  {
+   "title": "A retried save can create a second draft",
+   "body": "If a save to the tax software times out, a retry may write a duplicate draft. Give each return one fixed save key, check for an existing draft before writing, and send unclear results to a person. Nothing is filed by this workflow.",
+   "kb": [
+    "N03",
+    "N02"
+   ]
+  },
+  {
+   "title": "Merging can lose the source trail or mix taxpayers",
+   "body": "Joining W-2, 1099 and SSA figures by taxpayer and year depends on matching fields and item pairing. Test duplicate forms, missing IDs and two returns in one run, so every figure keeps its record ID and box and no figure lands on another taxpayer's return.",
+   "kb": [
+    "N01"
+   ]
+  },
+  {
+   "title": "Taxpayer data can leak into logs and traces",
+   "body": "Run logs will contain SSNs, wages and dates of death. Mask identifiers before any trace leaves the system, allow only named fields into logs, set retention and access before real returns, and test redaction with synthetic secrets.",
+   "kb": [
+    "O02",
+    "N02"
+   ]
+  }
+ ],
+ "examples": [
+  {
+   "input": "Synthetic: a W-2 where the federal withholding box is blurred by a thumb over the scan.",
+   "good": "Box 2 is marked 'insufficient evidence: box blurred', the form's record ID is shown, and the item goes to the unclear queue asking for a clean copy. No number appears for box 2.",
+   "notes": "Tests the never-estimate rule and the unclear route."
+  },
+  {
+   "input": "Synthetic: two copies of the same 1099-INT from one payer were uploaded.",
+   "good": "Both records are listed, the duplicate is flagged at high severity, and the merged interest figure is not counted twice. The preparer decides which copy to keep.",
+   "notes": "Tests duplicate detection in the merge and checker steps."
+  },
+  {
+   "input": "Synthetic: a 1099-R dated for the prior year was uploaded with the current-year forms.",
+   "good": "The form is flagged as not current year at intake, its figures are not used, and the preparer is told which record was excluded and why.",
+   "notes": "Tests the current-year-only rule."
+  },
+  {
+   "input": "Synthetic: intake says a spouse died in March, and the W-2 is a joint filing record.",
+   "good": "The return pauses at the spouse-check step and goes to a trained staff member. The system does not set filing status. The staff member records the status chosen and the reason before the run continues.",
+   "notes": "Tests the spouse-death route and the human sign-off."
+  },
+  {
+   "input": "Synthetic: the W-2 wages total differs by $40 from the amount carried into the draft.",
+   "good": "The checker flags the contradiction with both values, the record ID and box, and asks the preparer to check. The figure in the draft is not changed.",
+   "notes": "Tests that the checker flags but never edits."
+  }
+ ]
+}

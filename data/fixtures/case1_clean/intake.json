@@ -1,0 +1,35 @@
+{
+ "answering_party": "self",
+ "taxpayer": {
+  "first_name": "Eleanor",
+  "last_name": "Whitfield",
+  "ssn": "912-34-5678",
+  "dob": "1954-03-14",
+  "blind": false
+ },
+ "spouse": null,
+ "married": false,
+ "spouse_died_in_year": false,
+ "filing_status": "single",
+ "dependents": [],
+ "can_be_claimed_as_dependent": false,
+ "documents_declared": [
+  "W-2",
+  "SSA-1099",
+  "1099-R",
+  "1099-INT"
+ ],
+ "other_income_sources": [],
+ "estimated_payments": 500.0,
+ "schedule1_adjustments": 0.0,
+ "schedule1_other_income": 0.0,
+ "schedule2_line3": 0.0,
+ "schedule3_line8": 0.0,
+ "refund_account_description": "my checking account at Finger Lakes Savings",
+ "refund_account_is_own": true,
+ "noted_questions": [],
+ "volunteered_ssn_events": [],
+ "_uploaded": true,
+ "_confirmed": true,
+ "_dependents_done": true
+}

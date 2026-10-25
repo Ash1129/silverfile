@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "your-business-system": {
+      "type": "http",
+      "url": "https://REPLACE-with-your-MCP-server/mcp"
+    }
+  }
+}

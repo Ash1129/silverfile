@@ -1,0 +1,41 @@
+{
+ "answering_party": "self",
+ "taxpayer": {
+  "first_name": "Harold",
+  "last_name": "Benson",
+  "ssn": "923-45-6789",
+  "dob": "1949-11-02",
+  "blind": true
+ },
+ "spouse": {
+  "first_name": "Margaret",
+  "last_name": "Benson",
+  "dob": "1951-06-21",
+  "blind": false,
+  "date_of_death": "2025-05-09"
+ },
+ "married": true,
+ "spouse_died_in_year": true,
+ "filing_status": null,
+ "_filing_status_unsure": true,
+ "dependents": [],
+ "can_be_claimed_as_dependent": false,
+ "documents_declared": [
+  "SSA-1099",
+  "1099-R",
+  "1099-DIV"
+ ],
+ "other_income_sources": [],
+ "estimated_payments": 0.0,
+ "schedule1_adjustments": 0.0,
+ "schedule1_other_income": 0.0,
+ "schedule2_line3": 0.0,
+ "schedule3_line8": 0.0,
+ "refund_account_description": "our joint checking at Cayuga Trust",
+ "refund_account_is_own": true,
+ "noted_questions": [],
+ "volunteered_ssn_events": [],
+ "_uploaded": true,
+ "_confirmed": true,
+ "_dependents_done": true
+}

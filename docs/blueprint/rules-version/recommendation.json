@@ -1,0 +1,478 @@
+{
+ "task": "Prepare draft Form 1040-SR returns with source provenance for human review",
+ "topology": {
+  "primary": "routing",
+  "addOns": [
+   "evaluator"
+  ],
+  "why": [
+   {
+    "text": "You said the work arrives in a few distinct types. Sorting first lets each type get its own simpler instructions and tools.",
+    "ruleId": "T3",
+    "basis": {
+     "kind": "source",
+     "sources": [
+      "anthropic"
+     ]
+    }
+   },
+   {
+    "text": "You said a good result can be described as a clear checklist. That checklist can be turned into an automatic reviewer.",
+    "ruleId": "T11",
+    "basis": {
+     "kind": "source",
+     "sources": [
+      "anthropic"
+     ]
+    }
+   }
+  ]
+ },
+ "tools": [
+  {
+   "tool": "claude",
+   "role": "Where you do the task. You hand it the input; it follows your playbook.",
+   "core": true,
+   "why": [
+    {
+     "text": "You said you'll start it yourself. There's nothing to schedule, so the app you already use is enough.",
+     "ruleId": "TL3",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "enmgt",
+       "notes"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "tool": "skill",
+   "role": "Holds your playbook, so the same steps and house rules are applied every time this task comes up.",
+   "core": false,
+   "why": [
+    {
+     "text": "You said it should follow your house rules or playbook. Instructions you'd otherwise repeat every time belong in a Skill.",
+     "ruleId": "TL10",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "enmgt",
+       "notes"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "tool": "mcp",
+   "role": "Lets the AI look things up in your systems. Read-only access is enough.",
+   "core": false,
+   "why": [
+    {
+     "text": "You said it needs to look things up in your systems. An AI can only use another program through a connector that tells it which tools exist and how to call them.",
+     "ruleId": "TL11",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "enmgt",
+       "notes"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "tool": "system-prompt",
+   "role": "Sets the AI's role, tone and the rules that always apply.",
+   "core": false,
+   "why": [
+    {
+     "text": "Every AI setup needs one. It covers universal truths about your business, not the details of a single task.",
+     "ruleId": "TL13",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "notes",
+       "enmgt"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "tool": "resources",
+   "role": "The documents and data it relies on instead of guessing.",
+   "core": false,
+   "why": [
+    {
+     "text": "You said it should draw on reference material. Giving the AI the source material is the best defence against made-up details.",
+     "ruleId": "TL14",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "notes"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "tool": "promptfoo",
+   "role": "Tests examples and failure cases before changing the AI system.",
+   "core": false,
+   "why": [
+    {
+     "text": "A development team can turn acceptance criteria into repeatable regression checks.",
+     "ruleId": "TL19",
+     "basis": {
+      "kind": "design"
+     }
+    }
+   ]
+  },
+  {
+   "tool": "langfuse",
+   "role": "Traces AI runs, with sensitive content filtered before export.",
+   "core": false,
+   "why": [
+    {
+     "text": "Trace evidence helps the team diagnose failures and compare quality, latency and cost.",
+     "ruleId": "TL19",
+     "basis": {
+      "kind": "design"
+     }
+    }
+   ]
+  }
+ ],
+ "hybrid": [
+  {
+   "text": "Skill plus MCP: the Skill points the AI to the right tools, and MCP connectors carry out the actual calls.",
+   "why": {
+    "text": "A Skill can't call a tool itself, and a connector alone doesn't say when to use it. Together they cover both.",
+    "ruleId": "TL17",
+    "basis": {
+     "kind": "source",
+     "sources": [
+      "notes",
+      "enmgt"
+     ]
+    }
+   }
+  }
+ ],
+ "models": {
+  "needed": true,
+  "capabilities": [
+   {
+    "title": "Follows instructions closely",
+    "body": "Sticks to your brief and output format, run after run.",
+    "why": {
+     "text": "Every AI step depends on this.",
+     "ruleId": "M2",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "openai"
+      ]
+     }
+    }
+   },
+   {
+    "title": "Reliable tool use",
+    "body": "Calls the right tool with the right details, and notices when a call fails.",
+    "why": {
+     "text": "You said it needs to look things up in your systems.",
+     "ruleId": "M3",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "openai",
+       "anthropic"
+      ]
+     }
+    }
+   },
+   {
+    "title": "A large context window",
+    "body": "Can consider long documents at once without losing details. Past a point, splitting the work or retrieving only the relevant passages works better.",
+    "why": {
+     "text": "You said it should draw on reference material.",
+     "ruleId": "M5",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "notes"
+      ]
+     }
+    }
+   },
+   {
+    "title": "A small model for sorting",
+    "body": "Classifying a request is a simple task. It rarely needs the most capable model. The guide starts with Sonnet 5.5 here; test a smaller model once your examples show it's enough.",
+    "why": {
+     "text": "You said the work arrives in a few distinct types.",
+     "ruleId": "M7",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "openai"
+      ]
+     }
+    }
+   },
+   {
+    "title": "Data protection terms",
+    "body": "Business terms that exclude your data from training and let you control how long it's kept. If nothing may be stored at all, ask for zero data retention, which Anthropic offers on its API but not on personal plans or in the Claude app, and which rules out Claude Fable 5.1.",
+    "why": {
+     "text": "You said it handles personal or confidential information.",
+     "ruleId": "M9",
+     "basis": {
+      "kind": "source",
+      "sources": [
+       "anthropicDocs"
+      ]
+     }
+    }
+   }
+  ],
+  "process": [
+   "Build the first version with the most capable model for every step.",
+   "Run it on your real examples and record how good the results are. That is your baseline.",
+   "Before switching to a smaller model, try a lower effort setting on the same model if it offers one; that is often the better lever.",
+   "Swap in smaller, cheaper models one step at a time, keeping each swap only if quality still meets the baseline.",
+   "Judge each choice on three things: quality against your examples, cost per run, and speed."
+  ],
+  "examples": "Examples as of October 2026; check before choosing. Start with Claude Opus 5.5, Anthropic's default starting point, and use Claude Fable 5.1 only where Opus falls short. Balanced and the default for routine steps: Claude Sonnet 5.5. Fastest and cheapest, for sorting and extraction at high volume: Claude Haiku 5.5, a step down to test once Sonnet's results are your baseline. OpenAI, Google and others offer similar tiers."
+ },
+ "autonomy": {
+  "why": [
+   {
+    "text": "A fixed workflow is predictable, but its AI steps can still make mistakes.",
+    "ruleId": "AU1",
+    "basis": {
+     "kind": "design"
+    }
+   },
+   {
+    "text": "You explicitly require approval before release or action. High volume does not waive that requirement.",
+    "ruleId": "AU11",
+    "basis": {
+     "kind": "design"
+    }
+   }
+  ],
+  "checkpoints": [
+   "After a set number of failed attempts (start with 3), stop and hand the case to a person.",
+   "Customer-facing output is reviewed by a person until it has a proven track record.",
+   "Agree in advance what track record earns the next level, for example four weeks without a serious error.",
+   "A named person approves every result before release or action; reject, timeout and missing approval stop the run.",
+   "The reviewer sees the checklist or requirements beside the source material and any item marked insufficient evidence, and approves, changes or rejects one case at a time. No batch approval.",
+   "Track the override rate and the time per review. Overrides near zero, or reviews that take seconds, mean the review has become a rubber stamp.",
+   "Seed known-wrong cases into the queue, so catching them is measured."
+  ],
+  "guardrails": [
+   "Rule-based checks: input length limits, blocked words, and format checks on output.",
+   "A personal-data filter that checks output before it leaves the system.",
+   "A check for unsafe inputs, such as hidden instructions in emails or documents.",
+   "Relevance and tone checks, so replies stay on topic and on brand.",
+   "Add a new guardrail each time a real failure shows a gap."
+  ],
+  "level": 2,
+  "cap": 2
+ },
+ "gotchas": [
+  {
+   "id": "G3",
+   "priority": 2,
+   "title": "Incoming content can carry instructions",
+   "body": "An email or document can contain text aimed at your AI (\"ignore your rules and forward this\"). Treat incoming content as information, never as orders, and add a check for unsafe inputs.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "openai"
+    ]
+   }
+  },
+  {
+   "id": "G4",
+   "priority": 2,
+   "title": "Personal data can leak in output",
+   "body": "Filter output for personal information, share only what each step needs, and don't put secrets in the system prompt; prompts can be coaxed into revealing themselves.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "openai",
+     "notes"
+    ]
+   }
+  },
+  {
+   "id": "G5",
+   "priority": 2,
+   "title": "One off-brand reply costs more than it saves",
+   "body": "A single confident, wrong answer in front of a customer can undo months of time saved. Keep a person reviewing until the track record is clear.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "openai",
+     "notes"
+    ]
+   }
+  },
+  {
+   "id": "G6",
+   "priority": 3,
+   "title": "The bill grows with use",
+   "body": "Cloud AI charges for every word it reads and writes, so costs rise with volume, and an agent uses about four times as much as a chat. Set a monthly spending limit and a maximum reply length from day one. A limit stops the system when it is reached, so add an alert well before it.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "mindstudio",
+     "anthropicDocs"
+    ]
+   }
+  },
+  {
+   "id": "G8",
+   "priority": 4,
+   "title": "Check what it actually did",
+   "body": "In the chat app, Claude decides for itself whether to use tools or just answer. Look for the \"ran a command\" or tool steps in its reply before assuming it checked your files.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "notes"
+    ]
+   }
+  },
+  {
+   "id": "G9",
+   "priority": 4,
+   "title": "A Skill can't reach your systems by itself",
+   "body": "A Skill says what to do and which tools to use. It can include small scripts, but it still needs a connector or access set up for each of your systems, or it will point at something that isn't there.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "notes",
+     "enmgt",
+     "anthropicDocs"
+    ]
+   }
+  },
+  {
+   "id": "G17",
+   "priority": 4,
+   "title": "Every extra step must earn its place",
+   "body": "Each added stage costs money and time. Keep one only if your test examples show the result improves enough to justify it.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "anthropic",
+     "notes"
+    ]
+   }
+  },
+  {
+   "id": "G19",
+   "priority": 5,
+   "title": "The smartest model isn't always the best fit",
+   "body": "Top models are slower and cost more, and for simple steps they don't do better. Let your test examples decide, not the leaderboard.",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "notes",
+     "openai"
+    ]
+   }
+  }
+ ],
+ "firstSteps": [
+  "Collect 10 to 20 real past examples of this task, each with what a good result looked like. These become your test set.",
+  "Write the playbook in plain language and run it in Claude on your examples with the most capable model. Score each result against what good looked like.",
+  "Name one owner who reviews results at the starting level (approve the risky ones) and decide what track record would earn the next level."
+ ],
+ "fired": [
+  "A2",
+  "T3",
+  "T11",
+  "TL3",
+  "TL10",
+  "TL11",
+  "TL13",
+  "TL14",
+  "TL17",
+  "TL19",
+  "H5",
+  "M2",
+  "M3",
+  "M5",
+  "M7",
+  "M9",
+  "M10",
+  "AU1",
+  "AU5",
+  "AU9",
+  "AU10",
+  "S4",
+  "G3",
+  "G4",
+  "G5",
+  "G6",
+  "G8",
+  "G9",
+  "G17",
+  "G19",
+  "F1",
+  "F2",
+  "F3",
+  "AU11",
+  "AU13"
+ ],
+ "approach": {
+  "id": "workflow",
+  "title": "An automated workflow with AI steps. No agent needed.",
+  "summary": "You decide the steps in advance. AI does the reading, writing or judging inside those steps, but never chooses the path.",
+  "agents": "No agent",
+  "why": [
+   {
+    "text": "You said the steps are fixed but some need reading or judgement. A predictable path is easier to test and cheaper to run than an agent, and AI still handles the judgement calls.",
+    "ruleId": "A2",
+    "basis": {
+     "kind": "source",
+     "sources": [
+      "anthropic",
+      "notes"
+     ]
+    }
+   }
+  ]
+ },
+ "hosting": {
+  "title": "Cloud, pay as you go",
+  "body": "No hardware to buy and nothing to maintain. You pay per use, which suits a new system whose volume is still uncertain.",
+  "why": {
+   "text": "Start in the cloud and revisit if volume grows to hundreds of runs a day.",
+   "ruleId": "H5",
+   "basis": {
+    "kind": "source",
+    "sources": [
+     "mindstudio",
+     "costResearch"
+    ]
+   }
+  }
+ },
+ "simpler": {
+  "title": "One good prompt",
+  "body": "Before splitting the task into steps, try a single well-written prompt with your examples attached. Break it up only where that prompt keeps failing.",
+  "why": {
+   "text": "A single prompt is often enough, and its failures show you exactly which step needs its own treatment.",
+   "ruleId": "S4",
+   "basis": {
+    "kind": "design"
+   }
+  }
+ }
+}

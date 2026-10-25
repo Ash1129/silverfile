@@ -1,0 +1,37 @@
+{
+ "task": "Prepare draft Form 1040-SR returns with source provenance for human review",
+ "shape": "judgement",
+ "kinds": "yes",
+ "split": "sequential",
+ "quality": "clear",
+ "knowledge": [
+  "playbook",
+  "reference"
+ ],
+ "systems": "read",
+ "trigger": "manual",
+ "volume": "daily",
+ "risks": [
+  "visible",
+  "personal"
+ ],
+ "location": "open",
+ "team": "large",
+ "requirements": [
+  "approval"
+ ],
+ "details": [
+  {
+   "q": "How will W-2 and 1099 images reach the system?",
+   "a": "The taxpayer uploads them through the intake"
+  },
+  {
+   "q": "Who signs off on a pause involving a spouse who died in the year?",
+   "a": "Any trained Kushim employee"
+  },
+  {
+   "q": "Which tax years must a draft cover?",
+   "a": "Current tax year only"
+  }
+ ]
+}
