@@ -10,6 +10,7 @@ Run:  uvicorn silverfile.dashboard.app:create_app --factory --port 8765
 from __future__ import annotations
 
 import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
-from .. import service
+from .. import seed, service
 from ..forms.render import jinja_env, render_html, render_pdf, status_label
 from ..memory import session_summary
 
@@ -28,8 +29,17 @@ BUSY_STATUSES = ("extracting", "eligibility", "computing", "review")
 FILING_STATUSES = [("", "leave as is"), ("single", "Single"), ("mfj", "Married filing jointly"), ("mfs", "Married filing separately"), ("hoh", "Head of household"), ("qss", "Qualifying surviving spouse")]
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """With SILVERFILE_SEED_DEMO set and an empty index, seed the demo returns
+    before serving (see seed.py), so a fresh deployment is not an empty list."""
+    if seed.seed_enabled():
+        await run_in_threadpool(seed.seed_demo_returns)
+    yield
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="SilverFile dashboard", docs_url=None, redoc_url=None)
+    app = FastAPI(title="SilverFile dashboard", docs_url=None, redoc_url=None, lifespan=_lifespan)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
     templates = Jinja2Templates(env=jinja_env())
 

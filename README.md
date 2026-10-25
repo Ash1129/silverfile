@@ -35,6 +35,8 @@ Docker could not be run on the development machine (no Docker daemon). The Docke
 
 `render.yaml` deploys the Dockerfile to Render's free tier with no API key, so the shared copy runs in offline mode on the mock fixtures (the same mode the tests and evals use). Your `ANTHROPIC_API_KEY` stays in the local `.env`, which is gitignored and never copied into the image. Vercel is not a fit: its Python runtime is serverless with no writable disk, and the dashboard keeps sessions and uploads in SQLite and on disk.
 
+A fresh data directory would show an empty list, so with `SILVERFILE_SEED_DEMO=1` (set in the Dockerfile and `render.yaml`) the dashboard seeds six demo returns on its first start: two complete, one halted, two waiting on a person and one mid-conversation. They are real offline runs of the fixtures through the same service layer, with transcripts, traces and draft forms. `python run.py seed` does the same by hand (`--force` adds them even when returns exist), and the seed is a no-op once the index has rows.
+
 ## Topology
 
 ![graph](docs/graph.png)

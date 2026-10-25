@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SILVERFILE_DATA_DIR=/data
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SILVERFILE_DATA_DIR=/data SILVERFILE_SEED_DEMO=1
 COPY requirements.txt pyproject.toml ./
 COPY src ./src
 RUN pip install --no-cache-dir -r requirements.txt && pip install --no-cache-dir -e .

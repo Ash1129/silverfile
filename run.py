@@ -6,6 +6,7 @@
   python run.py chat [--case case1_clean]  hold the intake conversation in the terminal, answers typed by you
   python run.py batch [--no-context-strategy] [--docs 10]   the section-4.5 measurement; writes docs/metrics.md
   python run.py graph                      print the Mermaid diagram of the graph (and write docs/graph.mmd)
+  python run.py seed [--force]             add the demo returns to the dashboard's data directory (what a shared copy starts with)
 """
 from __future__ import annotations
 
@@ -145,6 +146,14 @@ def cmd_graph(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_seed(args: argparse.Namespace) -> int:
+    from silverfile.seed import seed_demo_returns
+
+    ids = seed_demo_returns(force=args.force)
+    print(f"seeded {len(ids)} demo return(s)" if ids else "index not empty; nothing seeded (use --force to add anyway)")
+    return 0
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -155,6 +164,7 @@ def cmd_serve(args: argparse.Namespace) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("seed"); s.add_argument("--force", action="store_true", help="seed even when returns already exist"); s.set_defaults(fn=cmd_seed)
     s = sub.add_parser("serve"); s.add_argument("--port", type=int, default=8000); s.add_argument("--host", default="127.0.0.1"); s.set_defaults(fn=cmd_serve)
     s = sub.add_parser("demo"); s.add_argument("case", nargs="?", default="case1_clean"); s.add_argument("--resolve", help="JSON resolution to apply to any escalation"); s.set_defaults(fn=cmd_demo)
     s = sub.add_parser("chat"); s.add_argument("--resume"); s.add_argument("--ephemeral", action="store_true"); s.set_defaults(fn=cmd_chat)

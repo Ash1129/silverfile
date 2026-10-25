@@ -11,3 +11,5 @@ services:
     envVars:
       - key: SILVERFILE_DATA_DIR
         value: /data
+      - key: SILVERFILE_SEED_DEMO   # seed six demo returns on first start so the list is not empty
+        value: "1"
