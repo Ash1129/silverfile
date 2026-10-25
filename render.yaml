@@ -1,0 +1,13 @@
+# One-click deploy to Render (https://render.com): New > Blueprint > pick this repo.
+# No ANTHROPIC_API_KEY is set here on purpose: the public copy runs in offline mode
+# (scripted intake, sidecar extraction, rule-only review) with the mock fixtures.
+# The key stays in your local .env and is used only by `python run.py serve` at home.
+services:
+  - type: web
+    name: silverfile
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: SILVERFILE_DATA_DIR
+        value: /data

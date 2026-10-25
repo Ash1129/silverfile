@@ -31,6 +31,10 @@ Other entry points:
 
 Docker could not be run on the development machine (no Docker daemon). The Dockerfile and compose file are included and were written against the same requirements file the local virtual environment was built from.
 
+### Sharing a demo copy
+
+`render.yaml` deploys the Dockerfile to Render's free tier with no API key, so the shared copy runs in offline mode on the mock fixtures (the same mode the tests and evals use). Your `ANTHROPIC_API_KEY` stays in the local `.env`, which is gitignored and never copied into the image. Vercel is not a fit: its Python runtime is serverless with no writable disk, and the dashboard keeps sessions and uploads in SQLite and on disk.
+
 ## Topology
 
 ![graph](docs/graph.png)
