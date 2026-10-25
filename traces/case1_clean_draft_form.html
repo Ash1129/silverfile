@@ -1,0 +1,2279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draft Form 1040-SR — Eleanor Whitfield — demo-7c1b76</title>
+<style>
+  :root { --ink: #1b1f23; --muted: #5a6470; --rule: #cfd6dd; --paper: #ffffff; --tint: #f3f6f9; --amber: #b4530a; --amber-bg: #fff3e6; --blue: #0b4f8a; --red: #a3201f; --green: #1d6b3a; }
+  * { box-sizing: border-box; }
+  html { font-size: 17px; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; font-size: 1rem; line-height: 1.5; color: var(--ink); background: #e9edf1; }
+  .page { max-width: 62rem; margin: 1.5rem auto; background: var(--paper); padding: 2rem 2.5rem 3rem; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+  .banner { background: var(--amber-bg); border: 2px solid var(--amber); color: #6b2b00; font-weight: 700; padding: .8rem 1rem; font-size: 1.05rem; border-radius: 4px; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin: 1rem 0; color: var(--muted); font-size: .95rem; flex-wrap: wrap; }
+  .toolbar a { color: var(--blue); }
+  h1 { font-size: 1.9rem; margin: 1rem 0 .25rem; letter-spacing: -.01em; }
+  h1 small { display: block; font-size: 1.05rem; color: var(--muted); font-weight: 500; margin-top: .25rem; }
+  h2 { font-size: 1.35rem; margin: 2rem 0 .6rem; padding-bottom: .3rem; border-bottom: 2px solid var(--ink); }
+  h3 { font-size: 1.1rem; margin: 1.25rem 0 .4rem; }
+  .muted { color: var(--muted); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9em; }
+  pre { margin: .25rem 0 0; white-space: pre-wrap; word-break: break-word; background: var(--tint); padding: .5rem .6rem; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: .9rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { width: 4.5rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+  td.amount, th.amount { text-align: right; width: 13rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.total td { font-weight: 700; background: var(--tint); }
+  tr.missing td.amount { color: var(--red); }
+  /* identity block */
+  .identity { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .5rem 2rem; border: 1px solid var(--rule); padding: 1rem 1.25rem; border-radius: 4px; }
+  .identity dl { margin: 0; }
+  .identity dt { font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: .6rem; }
+  .identity dd { margin: 0; font-size: 1.05rem; }
+  .boxes li { list-style: none; margin: .2rem 0; }
+  .boxes ul { padding: 0; margin: .25rem 0 0; }
+  .box { display: inline-block; width: 1.2rem; height: 1.2rem; border: 2px solid var(--ink); vertical-align: -.25rem; margin-right: .5rem; text-align: center; line-height: 1rem; font-weight: 700; font-size: .95rem; }
+  /* provenance popover: CSS hover/focus, pinned on click by the tiny script */
+  .prov { position: relative; display: inline-block; }
+  .prov .amt { cursor: help; border-bottom: 2px dotted var(--blue); color: var(--ink); padding: 0 .1rem; outline-offset: 2px; }
+  .prov .amt:focus { outline: 2px solid var(--blue); }
+  .prov-card { display: none; position: absolute; right: 0; top: calc(100% + .4rem); z-index: 20; width: min(30rem, 90vw); text-align: left; white-space: normal; font-weight: 400; font-size: .92rem; line-height: 1.4; background: #fff; color: var(--ink); border: 1px solid var(--rule); border-top: 4px solid var(--blue); border-radius: 6px; padding: .8rem 1rem; box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+  .prov:hover .prov-card, .prov:focus-within .prov-card, .prov.pinned .prov-card { display: block; }
+  .prov-card strong.title { display: block; font-size: 1rem; margin-bottom: .4rem; }
+  .prov-card dl { margin: 0; display: grid; grid-template-columns: 7.5rem 1fr; gap: .2rem .6rem; }
+  .prov-card dt { color: var(--muted); font-size: .85rem; }
+  .prov-card dd { margin: 0; }
+  .prov-card pre { font-size: .82rem; max-height: 16rem; overflow: auto; }
+  .prov-card .hint { display: block; margin-top: .5rem; color: var(--muted); font-size: .8rem; }
+  .kind { display: inline-block; padding: 0 .45rem; border-radius: 3px; background: var(--tint); border: 1px solid var(--rule); font-size: .85rem; }
+  .pill { display: inline-block; padding: .05rem .55rem; border-radius: 999px; font-size: .85rem; font-weight: 600; border: 1px solid currentColor; }
+  .pill.ok { color: var(--green); } .pill.bad { color: var(--red); } .pill.note { color: var(--amber); }
+  .doc { border: 1px solid var(--rule); border-radius: 4px; padding: .75rem 1rem; margin: .75rem 0; }
+  .doc table td, .doc table th { padding: .3rem .5rem; font-size: .95rem; }
+  .issues li { color: var(--red); }
+  ul.plain { padding-left: 1.2rem; }
+  @media print { body { background: #fff; } .page { box-shadow: none; margin: 0; max-width: none; } .toolbar { display: none; } .prov-card { display: none !important; } }
+  @media (max-width: 40rem) { .page { padding: 1rem; } td.amount, th.amount { width: auto; } .prov-card { right: auto; left: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="banner" role="alert">DRAFT — prepared by SilverFile for review by a Kushim preparer. Not filed. Not advice.</div>
+  <div class="toolbar">
+    <span>Return <code>demo-7c1b76</code> · Draft complete · created 2026-10-25 20:22 UTC</span>
+    <span>
+      Hover, tab to, or click any amount to see where it came from.
+    </span>
+  </div>
+
+  <h1>Form 1040-SR <small>U.S. Tax Return for Seniors — tax year 2025 — DRAFT</small></h1>
+
+  <div class="identity">
+    <dl>
+      <dt>Your first name and last name</dt><dd>Eleanor Whitfield</dd>
+      <dt>Your Social Security number</dt><dd>***-**-5678</dd>
+      <dt>Date of birth</dt><dd>1954-03-14</dd>
+      <dt>Filing status</dt><dd>Single</dd>
+<dt>Schedules</dt><dd>Schedule 1-A</dd>    </dl>
+    <dl>
+      <dt>Dependents</dt>
+      <dd>none</dd>
+<dt>Refund to (taxpayer's words)</dt><dd>my checking account at Finger Lakes Savings</dd>    </dl>
+    <dl class="boxes">
+      <dt>Age / blindness (line 12d)</dt>
+      <dd><ul><li><span class="box" aria-hidden="true">X</span>You were born before January 2, 1961 <span class="muted">(checked)</span></li><li><span class="box" aria-hidden="true"></span>You are blind</li><li><span class="box" aria-hidden="true"></span>Spouse was born before January 2, 1961</li><li><span class="box" aria-hidden="true"></span>Spouse is blind</li></ul>
+      <div class="muted" style="margin-top:.3rem">Boxes checked: 1</div></dd>
+    </dl>
+  </div>
+
+
+
+  <h2>Income</h2>
+  <table>
+    <thead><tr><th class="num">Line</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr id="line-1z" class="">
+        <td class="num">1z</td>
+        <td>Total wages, salaries, tips</td>
+        <td class="amount">    <span class="prov" id="prov-1z">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-1z" aria-label="$18,400.00 — show provenance">$18,400.00</span>
+      <span class="prov-card" id="card-1z" role="tooltip">
+        <strong class="title">Line 1z — Total wages, salaries, tips</strong>
+        <dl>
+          <dt>Amount</dt><dd>$18,400.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    18400.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 1&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-w2-image-1">w2-image-1</a></dd>
+          <dt>Citations</dt><dd>REF-SC-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-2a" class="">
+        <td class="num">2a</td>
+        <td>Tax-exempt interest</td>
+        <td class="amount">    <span class="prov" id="prov-2a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-2a" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-2a" role="tooltip">
+        <strong class="title">Line 2a — Tax-exempt interest</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    0.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 8&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099int">1099int</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-2b" class="">
+        <td class="num">2b</td>
+        <td>Taxable interest</td>
+        <td class="amount">    <span class="prov" id="prov-2b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-2b" aria-label="$842.17 — show provenance">$842.17</span>
+      <span class="prov-card" id="card-2b" role="tooltip">
+        <strong class="title">Line 2b — Taxable interest</strong>
+        <dl>
+          <dt>Amount</dt><dd>$842.17</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    842.17
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 1&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099int">1099int</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-3a" class="">
+        <td class="num">3a</td>
+        <td>Qualified dividends</td>
+        <td class="amount">    <span class="prov" id="prov-3a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-3a" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-3a" role="tooltip">
+        <strong class="title">Line 3a — Qualified dividends</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [],
+  &#34;boxes&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-3b" class="">
+        <td class="num">3b</td>
+        <td>Ordinary dividends</td>
+        <td class="amount">    <span class="prov" id="prov-3b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-3b" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-3b" role="tooltip">
+        <strong class="title">Line 3b — Ordinary dividends</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [],
+  &#34;boxes&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-4a" class="">
+        <td class="num">4a</td>
+        <td>IRA distributions (total)</td>
+        <td class="amount">    <span class="prov" id="prov-4a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-4a" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-4a" role="tooltip">
+        <strong class="title">Line 4a — IRA distributions (total)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [],
+  &#34;boxes&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-4b" class="">
+        <td class="num">4b</td>
+        <td>IRA distributions (taxable)</td>
+        <td class="amount">    <span class="prov" id="prov-4b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-4b" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-4b" role="tooltip">
+        <strong class="title">Line 4b — IRA distributions (taxable)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.taxable_1099r + sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-5a" class="">
+        <td class="num">5a</td>
+        <td>Pensions and annuities (total)</td>
+        <td class="amount">    <span class="prov" id="prov-5a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-5a" aria-label="$14,200.00 — show provenance">$14,200.00</span>
+      <span class="prov-card" id="card-5a" role="tooltip">
+        <strong class="title">Line 5a — Pensions and annuities (total)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$14,200.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    14200.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 1 (pension)&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-5b" class="">
+        <td class="num">5b</td>
+        <td>Pensions and annuities (taxable)</td>
+        <td class="amount">    <span class="prov" id="prov-5b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-5b" aria-label="$14,200.00 — show provenance">$14,200.00</span>
+      <span class="prov-card" id="card-5b" role="tooltip">
+        <strong class="title">Line 5b — Pensions and annuities (taxable)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$14,200.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.taxable_1099r + sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    14200.0
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-6a" class="">
+        <td class="num">6a</td>
+        <td>Social Security benefits (total)</td>
+        <td class="amount">    <span class="prov" id="prov-6a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-6a" aria-label="$21,600.00 — show provenance">$21,600.00</span>
+      <span class="prov-card" id="card-6a" role="tooltip">
+        <strong class="title">Line 6a — Social Security benefits (total)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$21,600.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    21600.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 5&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-ssa1099">ssa1099</a></dd>
+          <dt>Citations</dt><dd>REF-SS-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-6b" class="">
+        <td class="num">6b</td>
+        <td>Social Security benefits (taxable)</td>
+        <td class="amount">    <span class="prov" id="prov-6b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-6b" aria-label="$13,205.84 — show provenance">$13,205.84</span>
+      <span class="prov-card" id="card-6b" role="tooltip">
+        <strong class="title">Line 6b — Social Security benefits (taxable)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$13,205.84</dd>
+          <dt>Source kind</dt><dd>worksheet</dd>
+          <dt>Method</dt><dd><code>tax_math.taxable_social_security</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;total_benefits&#34;: 21600.0,
+  &#34;agi_excluding_benefits&#34;: 33442.17,
+  &#34;tax_exempt_interest&#34;: 0.0,
+  &#34;provisional_income&#34;: 44242.17,
+  &#34;tier&#34;: &#34;second-tier&#34;
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-6a">6a</a>, <a href="#line-2a">2a</a>, <a href="#line-1z">1z</a>, <a href="#line-2b">2b</a>, <a href="#line-3b">3b</a>, <a href="#line-4b">4b</a>, <a href="#line-5b">5b</a>, <a href="#line-8">8</a>, <a href="#line-10">10</a></dd>
+          <dt>Citations</dt><dd>REF-SS-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-7" class="">
+        <td class="num">7</td>
+        <td>Capital gain or (loss)</td>
+        <td class="amount">    <span class="prov" id="prov-7">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-7" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-7" role="tooltip">
+        <strong class="title">Line 7 — Capital gain or (loss)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>out of scope (Schedule D); 0 by profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>REF-SC-2</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-8" class="">
+        <td class="num">8</td>
+        <td>Additional income (Schedule 1, line 10)</td>
+        <td class="amount">    <span class="prov" id="prov-8">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-8" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-8" role="tooltip">
+        <strong class="title">Line 8 — Additional income (Schedule 1, line 10)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-9" class="total">
+        <td class="num">9</td>
+        <td>Total income</td>
+        <td class="amount">    <span class="prov" id="prov-9">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-9" aria-label="$46,648.01 — show provenance">$46,648.01</span>
+      <span class="prov-card" id="card-9" role="tooltip">
+        <strong class="title">Line 9 — Total income</strong>
+        <dl>
+          <dt>Amount</dt><dd>$46,648.01</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;1z&#34;,
+    &#34;2b&#34;,
+    &#34;3b&#34;,
+    &#34;4b&#34;,
+    &#34;5b&#34;,
+    &#34;6b&#34;,
+    &#34;7&#34;,
+    &#34;8&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-1z">1z</a>, <a href="#line-2b">2b</a>, <a href="#line-3b">3b</a>, <a href="#line-4b">4b</a>, <a href="#line-5b">5b</a>, <a href="#line-6b">6b</a>, <a href="#line-7">7</a>, <a href="#line-8">8</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>Adjusted gross income</h2>
+  <table>
+    <thead><tr><th class="num">Line</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr id="line-10" class="">
+        <td class="num">10</td>
+        <td>Adjustments to income (Schedule 1, line 26)</td>
+        <td class="amount">    <span class="prov" id="prov-10">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-10" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-10" role="tooltip">
+        <strong class="title">Line 10 — Adjustments to income (Schedule 1, line 26)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-11a" class="total">
+        <td class="num">11a</td>
+        <td>Adjusted gross income</td>
+        <td class="amount">    <span class="prov" id="prov-11a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-11a" aria-label="$46,648.01 — show provenance">$46,648.01</span>
+      <span class="prov-card" id="card-11a" role="tooltip">
+        <strong class="title">Line 11a — Adjusted gross income</strong>
+        <dl>
+          <dt>Amount</dt><dd>$46,648.01</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.subtract</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;a&#34;: 46648.01,
+  &#34;b&#34;: 0.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-9">9</a>, <a href="#line-10">10</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>Standard deduction</h2>
+  <table>
+    <thead><tr><th class="num">Line</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr id="line-12d" class="">
+        <td class="num">12d</td>
+        <td>Age / blindness boxes checked</td>
+        <td class="amount">    <span class="prov" id="prov-12d">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-12d" aria-label="1 box checked — show provenance">1 box checked</span>
+      <span class="prov-card" id="card-12d" role="tooltip">
+        <strong class="title">Line 12d — Age / blindness boxes checked</strong>
+        <dl>
+          <dt>Amount</dt><dd>1 box checked</dd>
+          <dt>Source kind</dt><dd>chart</dd>
+          <dt>Method</dt><dd><code>tax_math.count_12d_boxes</code></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;taxpayer_65&#34;: true,
+  &#34;taxpayer_blind&#34;: false,
+  &#34;spouse_65&#34;: false,
+  &#34;spouse_blind&#34;: false
+}</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>REF-SD-3</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-12e" class="">
+        <td class="num">12e</td>
+        <td>Standard deduction</td>
+        <td class="amount">    <span class="prov" id="prov-12e">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-12e" aria-label="$17,750.00 — show provenance">$17,750.00</span>
+      <span class="prov-card" id="card-12e" role="tooltip">
+        <strong class="title">Line 12e — Standard deduction</strong>
+        <dl>
+          <dt>Amount</dt><dd>$17,750.00</dd>
+          <dt>Source kind</dt><dd>chart</dd>
+          <dt>Method</dt><dd><code>tax_math.standard_deduction</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;boxes_checked&#34;: 1,
+  &#34;base&#34;: 15750.0,
+  &#34;per_box&#34;: 2000.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-12d">12d</a></dd>
+          <dt>Citations</dt><dd>REF-SD-1, REF-SD-2</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-13b" class="">
+        <td class="num">13b</td>
+        <td>Additional deductions (Schedule 1-A)</td>
+        <td class="amount">    <span class="prov" id="prov-13b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-13b" aria-label="$6,000.00 — show provenance">$6,000.00</span>
+      <span class="prov-card" id="card-13b" role="tooltip">
+        <strong class="title">Line 13b — Additional deductions (Schedule 1-A)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$6,000.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.senior_deduction</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;magi&#34;: 46648.01,
+  &#34;qualifying_persons&#34;: 1,
+  &#34;threshold&#34;: 75000.0,
+  &#34;excess_magi&#34;: 0.0,
+  &#34;reduction_per_person&#34;: 0.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-11a">11a</a>, <a href="#line-12d">12d</a></dd>
+          <dt>Citations</dt><dd>REF-SR-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-14" class="total">
+        <td class="num">14</td>
+        <td>Total deductions</td>
+        <td class="amount">    <span class="prov" id="prov-14">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-14" aria-label="$23,750.00 — show provenance">$23,750.00</span>
+      <span class="prov-card" id="card-14" role="tooltip">
+        <strong class="title">Line 14 — Total deductions</strong>
+        <dl>
+          <dt>Amount</dt><dd>$23,750.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;12e&#34;,
+    &#34;13b&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-12e">12e</a>, <a href="#line-13b">13b</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-15" class="total">
+        <td class="num">15</td>
+        <td>Taxable income</td>
+        <td class="amount">    <span class="prov" id="prov-15">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-15" aria-label="$22,898.01 — show provenance">$22,898.01</span>
+      <span class="prov-card" id="card-15" role="tooltip">
+        <strong class="title">Line 15 — Taxable income</strong>
+        <dl>
+          <dt>Amount</dt><dd>$22,898.01</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.nonnegative_difference</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;a&#34;: 46648.01,
+  &#34;b&#34;: 23750.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-11a">11a</a>, <a href="#line-14">14</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>Tax and credits</h2>
+  <table>
+    <thead><tr><th class="num">Line</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr id="line-16" class="">
+        <td class="num">16</td>
+        <td>Tax (rate schedule)</td>
+        <td class="amount">    <span class="prov" id="prov-16">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-16" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-16" role="tooltip">
+        <strong class="title">Line 16 — Tax (rate schedule)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>rate-schedule</dd>
+          <dt>Method</dt><dd><code>tax_math.income_tax</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;taxable_income&#34;: 22898.01,
+  &#34;brackets&#34;: [
+    {
+      &#34;from&#34;: 0.0,
+      &#34;to&#34;: 11925.0,
+      &#34;rate&#34;: 0.1,
+      &#34;tax&#34;: 1192.5
+    },
+    {
+      &#34;from&#34;: 11925.0,
+      &#34;to&#34;: 22898.01,
+      &#34;rate&#34;: 0.12,
+      &#34;tax&#34;: 1316.76
+    }
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-15">15</a></dd>
+          <dt>Citations</dt><dd>REF-TX-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-17" class="">
+        <td class="num">17</td>
+        <td>Amount from Schedule 2, line 3</td>
+        <td class="amount">    <span class="prov" id="prov-17">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-17" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-17" role="tooltip">
+        <strong class="title">Line 17 — Amount from Schedule 2, line 3</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-18" class="">
+        <td class="num">18</td>
+        <td>Add lines 16 and 17</td>
+        <td class="amount">    <span class="prov" id="prov-18">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-18" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-18" role="tooltip">
+        <strong class="title">Line 18 — Add lines 16 and 17</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;16&#34;,
+    &#34;17&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-16">16</a>, <a href="#line-17">17</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-19" class="">
+        <td class="num">19</td>
+        <td>Child tax credit / credit for other dependents</td>
+        <td class="amount">    <span class="prov" id="prov-19">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-19" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-19" role="tooltip">
+        <strong class="title">Line 19 — Child tax credit / credit for other dependents</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>no credit claimed in profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-20" class="">
+        <td class="num">20</td>
+        <td>Amount from Schedule 3, line 8</td>
+        <td class="amount">    <span class="prov" id="prov-20">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-20" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-20" role="tooltip">
+        <strong class="title">Line 20 — Amount from Schedule 3, line 8</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-21" class="">
+        <td class="num">21</td>
+        <td>Add lines 19 and 20</td>
+        <td class="amount">    <span class="prov" id="prov-21">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-21" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-21" role="tooltip">
+        <strong class="title">Line 21 — Add lines 19 and 20</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;19&#34;,
+    &#34;20&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-19">19</a>, <a href="#line-20">20</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-22" class="">
+        <td class="num">22</td>
+        <td>Subtract line 21 from line 18</td>
+        <td class="amount">    <span class="prov" id="prov-22">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-22" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-22" role="tooltip">
+        <strong class="title">Line 22 — Subtract line 21 from line 18</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.nonnegative_difference</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;a&#34;: 2509.26,
+  &#34;b&#34;: 0.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-18">18</a>, <a href="#line-21">21</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-23" class="">
+        <td class="num">23</td>
+        <td>Other taxes (Schedule 2, line 21)</td>
+        <td class="amount">    <span class="prov" id="prov-23">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-23" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-23" role="tooltip">
+        <strong class="title">Line 23 — Other taxes (Schedule 2, line 21)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd><dt>Note</dt><dd>not provided; treated as 0</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-24" class="total">
+        <td class="num">24</td>
+        <td>Total tax</td>
+        <td class="amount">    <span class="prov" id="prov-24">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-24" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-24" role="tooltip">
+        <strong class="title">Line 24 — Total tax</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;22&#34;,
+    &#34;23&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-22">22</a>, <a href="#line-23">23</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>Payments</h2>
+  <table>
+    <thead><tr><th class="num">Line</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr id="line-25a" class="">
+        <td class="num">25a</td>
+        <td>Federal income tax withheld from W-2</td>
+        <td class="amount">    <span class="prov" id="prov-25a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25a" aria-label="$1,210.00 — show provenance">$1,210.00</span>
+      <span class="prov-card" id="card-25a" role="tooltip">
+        <strong class="title">Line 25a — Federal income tax withheld from W-2</strong>
+        <dl>
+          <dt>Amount</dt><dd>$1,210.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    1210.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 2&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-w2-image-1">w2-image-1</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-25b" class="">
+        <td class="num">25b</td>
+        <td>Federal income tax withheld from 1099</td>
+        <td class="amount">    <span class="prov" id="prov-25b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25b" aria-label="$900.00 — show provenance">$900.00</span>
+      <span class="prov-card" id="card-25b" role="tooltip">
+        <strong class="title">Line 25b — Federal income tax withheld from 1099</strong>
+        <dl>
+          <dt>Amount</dt><dd>$900.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    900.0,
+    0.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 4 (1099-R)&#34;,
+    &#34;Box 6 (SSA-1099)&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a>, <a href="#doc-ssa1099">ssa1099</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-25c" class="">
+        <td class="num">25c</td>
+        <td>Federal income tax withheld, other forms</td>
+        <td class="amount">    <span class="prov" id="prov-25c">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25c" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-25c" role="tooltip">
+        <strong class="title">Line 25c — Federal income tax withheld, other forms</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>none in profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-25d" class="">
+        <td class="num">25d</td>
+        <td>Total federal income tax withheld</td>
+        <td class="amount">    <span class="prov" id="prov-25d">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25d" aria-label="$2,110.00 — show provenance">$2,110.00</span>
+      <span class="prov-card" id="card-25d" role="tooltip">
+        <strong class="title">Line 25d — Total federal income tax withheld</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,110.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;25a&#34;,
+    &#34;25b&#34;,
+    &#34;25c&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-25a">25a</a>, <a href="#line-25b">25b</a>, <a href="#line-25c">25c</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-26" class="">
+        <td class="num">26</td>
+        <td>2025 estimated tax payments</td>
+        <td class="amount">    <span class="prov" id="prov-26">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-26" aria-label="$500.00 — show provenance">$500.00</span>
+      <span class="prov-card" id="card-26" role="tooltip">
+        <strong class="title">Line 26 — 2025 estimated tax payments</strong>
+        <dl>
+          <dt>Amount</dt><dd>$500.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-32" class="">
+        <td class="num">32</td>
+        <td>Total other payments and refundable credits</td>
+        <td class="amount">    <span class="prov" id="prov-32">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-32" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-32" role="tooltip">
+        <strong class="title">Line 32 — Total other payments and refundable credits</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>no refundable credits in profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-33" class="total">
+        <td class="num">33</td>
+        <td>Total payments</td>
+        <td class="amount">    <span class="prov" id="prov-33">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-33" aria-label="$2,610.00 — show provenance">$2,610.00</span>
+      <span class="prov-card" id="card-33" role="tooltip">
+        <strong class="title">Line 33 — Total payments</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,610.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;25d&#34;,
+    &#34;26&#34;,
+    &#34;32&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-25d">25d</a>, <a href="#line-26">26</a>, <a href="#line-32">32</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>Refund or amount you owe</h2>
+  <table>
+    <thead><tr><th class="num">Line</th><th>Description</th><th class="amount">Amount</th></tr></thead>
+    <tbody>
+      <tr id="line-34" class="total">
+        <td class="num">34</td>
+        <td>Overpaid</td>
+        <td class="amount">    <span class="prov" id="prov-34">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-34" aria-label="$100.74 — show provenance">$100.74</span>
+      <span class="prov-card" id="card-34" role="tooltip">
+        <strong class="title">Line 34 — Overpaid</strong>
+        <dl>
+          <dt>Amount</dt><dd>$100.74</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.settle</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;total_tax&#34;: 2509.26,
+  &#34;total_payments&#34;: 2610.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-33">33</a>, <a href="#line-24">24</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+      <tr id="line-37" class="total">
+        <td class="num">37</td>
+        <td>Amount you owe</td>
+        <td class="amount">    <span class="prov" id="prov-37">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-37" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-37" role="tooltip">
+        <strong class="title">Line 37 — Amount you owe</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.settle</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;total_tax&#34;: 2509.26,
+  &#34;total_payments&#34;: 2610.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-24">24</a>, <a href="#line-33">33</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <h2>Provenance — one row per line</h2>
+  <table class="provtable">
+    <thead><tr><th class="num">Line</th><th>Label</th><th class="amount">Amount</th><th>Source kind</th><th>Method</th><th>Sources</th><th>Citations</th><th>Entered</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="num"><a href="#line-1z">1z</a></td>
+        <td>Total wages, salaries, tips</td>
+        <td class="amount">    <span class="prov" id="prov-1z">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-1z" aria-label="$18,400.00 — show provenance">$18,400.00</span>
+      <span class="prov-card" id="card-1z" role="tooltip">
+        <strong class="title">Line 1z — Total wages, salaries, tips</strong>
+        <dl>
+          <dt>Amount</dt><dd>$18,400.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    18400.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 1&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-w2-image-1">w2-image-1</a></dd>
+          <dt>Citations</dt><dd>REF-SC-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-w2-image-1">w2-image-1</a></td>
+        <td>REF-SC-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-2a">2a</a></td>
+        <td>Tax-exempt interest</td>
+        <td class="amount">    <span class="prov" id="prov-2a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-2a" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-2a" role="tooltip">
+        <strong class="title">Line 2a — Tax-exempt interest</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    0.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 8&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099int">1099int</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-1099int">1099int</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-2b">2b</a></td>
+        <td>Taxable interest</td>
+        <td class="amount">    <span class="prov" id="prov-2b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-2b" aria-label="$842.17 — show provenance">$842.17</span>
+      <span class="prov-card" id="card-2b" role="tooltip">
+        <strong class="title">Line 2b — Taxable interest</strong>
+        <dl>
+          <dt>Amount</dt><dd>$842.17</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    842.17
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 1&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099int">1099int</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-1099int">1099int</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-3a">3a</a></td>
+        <td>Qualified dividends</td>
+        <td class="amount">    <span class="prov" id="prov-3a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-3a" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-3a" role="tooltip">
+        <strong class="title">Line 3a — Qualified dividends</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [],
+  &#34;boxes&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-3b">3b</a></td>
+        <td>Ordinary dividends</td>
+        <td class="amount">    <span class="prov" id="prov-3b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-3b" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-3b" role="tooltip">
+        <strong class="title">Line 3b — Ordinary dividends</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [],
+  &#34;boxes&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-4a">4a</a></td>
+        <td>IRA distributions (total)</td>
+        <td class="amount">    <span class="prov" id="prov-4a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-4a" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-4a" role="tooltip">
+        <strong class="title">Line 4a — IRA distributions (total)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [],
+  &#34;boxes&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-1099r">1099r</a></td>
+        <td>REF-RT-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-4b">4b</a></td>
+        <td>IRA distributions (taxable)</td>
+        <td class="amount">    <span class="prov" id="prov-4b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-4b" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-4b" role="tooltip">
+        <strong class="title">Line 4b — IRA distributions (taxable)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.taxable_1099r + sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: []
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.taxable_1099r + sum_amounts</code></td>
+        <td><a href="#doc-1099r">1099r</a></td>
+        <td>REF-RT-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-5a">5a</a></td>
+        <td>Pensions and annuities (total)</td>
+        <td class="amount">    <span class="prov" id="prov-5a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-5a" aria-label="$14,200.00 — show provenance">$14,200.00</span>
+      <span class="prov-card" id="card-5a" role="tooltip">
+        <strong class="title">Line 5a — Pensions and annuities (total)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$14,200.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    14200.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 1 (pension)&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-1099r">1099r</a></td>
+        <td>REF-RT-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-5b">5b</a></td>
+        <td>Pensions and annuities (taxable)</td>
+        <td class="amount">    <span class="prov" id="prov-5b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-5b" aria-label="$14,200.00 — show provenance">$14,200.00</span>
+      <span class="prov-card" id="card-5b" role="tooltip">
+        <strong class="title">Line 5b — Pensions and annuities (taxable)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$14,200.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.taxable_1099r + sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    14200.0
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a></dd>
+          <dt>Citations</dt><dd>REF-RT-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.taxable_1099r + sum_amounts</code></td>
+        <td><a href="#doc-1099r">1099r</a></td>
+        <td>REF-RT-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-6a">6a</a></td>
+        <td>Social Security benefits (total)</td>
+        <td class="amount">    <span class="prov" id="prov-6a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-6a" aria-label="$21,600.00 — show provenance">$21,600.00</span>
+      <span class="prov-card" id="card-6a" role="tooltip">
+        <strong class="title">Line 6a — Social Security benefits (total)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$21,600.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    21600.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 5&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-ssa1099">ssa1099</a></dd>
+          <dt>Citations</dt><dd>REF-SS-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-ssa1099">ssa1099</a></td>
+        <td>REF-SS-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-6b">6b</a></td>
+        <td>Social Security benefits (taxable)</td>
+        <td class="amount">    <span class="prov" id="prov-6b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-6b" aria-label="$13,205.84 — show provenance">$13,205.84</span>
+      <span class="prov-card" id="card-6b" role="tooltip">
+        <strong class="title">Line 6b — Social Security benefits (taxable)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$13,205.84</dd>
+          <dt>Source kind</dt><dd>worksheet</dd>
+          <dt>Method</dt><dd><code>tax_math.taxable_social_security</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;total_benefits&#34;: 21600.0,
+  &#34;agi_excluding_benefits&#34;: 33442.17,
+  &#34;tax_exempt_interest&#34;: 0.0,
+  &#34;provisional_income&#34;: 44242.17,
+  &#34;tier&#34;: &#34;second-tier&#34;
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-6a">6a</a>, <a href="#line-2a">2a</a>, <a href="#line-1z">1z</a>, <a href="#line-2b">2b</a>, <a href="#line-3b">3b</a>, <a href="#line-4b">4b</a>, <a href="#line-5b">5b</a>, <a href="#line-8">8</a>, <a href="#line-10">10</a></dd>
+          <dt>Citations</dt><dd>REF-SS-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>worksheet</td>
+        <td><code>tax_math.taxable_social_security</code></td>
+        <td><a href="#line-6a">6a</a>, <a href="#line-2a">2a</a>, <a href="#line-1z">1z</a>, <a href="#line-2b">2b</a>, <a href="#line-3b">3b</a>, <a href="#line-4b">4b</a>, <a href="#line-5b">5b</a>, <a href="#line-8">8</a>, <a href="#line-10">10</a></td>
+        <td>REF-SS-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-7">7</a></td>
+        <td>Capital gain or (loss)</td>
+        <td class="amount">    <span class="prov" id="prov-7">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-7" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-7" role="tooltip">
+        <strong class="title">Line 7 — Capital gain or (loss)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>out of scope (Schedule D); 0 by profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>REF-SC-2</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>out of scope (Schedule D); 0 by profile</code></td>
+        <td>—</td>
+        <td>REF-SC-2</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-8">8</a></td>
+        <td>Additional income (Schedule 1, line 10)</td>
+        <td class="amount">    <span class="prov" id="prov-8">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-8" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-8" role="tooltip">
+        <strong class="title">Line 8 — Additional income (Schedule 1, line 10)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>user</td>
+        <td><code>direct user input</code></td>
+        <td>intake</td>
+        <td>—</td>
+        <td>taxpayer<br><span class="muted">2026-10-25 20:22 UTC</span></td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-9">9</a></td>
+        <td>Total income</td>
+        <td class="amount">    <span class="prov" id="prov-9">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-9" aria-label="$46,648.01 — show provenance">$46,648.01</span>
+      <span class="prov-card" id="card-9" role="tooltip">
+        <strong class="title">Line 9 — Total income</strong>
+        <dl>
+          <dt>Amount</dt><dd>$46,648.01</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;1z&#34;,
+    &#34;2b&#34;,
+    &#34;3b&#34;,
+    &#34;4b&#34;,
+    &#34;5b&#34;,
+    &#34;6b&#34;,
+    &#34;7&#34;,
+    &#34;8&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-1z">1z</a>, <a href="#line-2b">2b</a>, <a href="#line-3b">3b</a>, <a href="#line-4b">4b</a>, <a href="#line-5b">5b</a>, <a href="#line-6b">6b</a>, <a href="#line-7">7</a>, <a href="#line-8">8</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-1z">1z</a>, <a href="#line-2b">2b</a>, <a href="#line-3b">3b</a>, <a href="#line-4b">4b</a>, <a href="#line-5b">5b</a>, <a href="#line-6b">6b</a>, <a href="#line-7">7</a>, <a href="#line-8">8</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-10">10</a></td>
+        <td>Adjustments to income (Schedule 1, line 26)</td>
+        <td class="amount">    <span class="prov" id="prov-10">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-10" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-10" role="tooltip">
+        <strong class="title">Line 10 — Adjustments to income (Schedule 1, line 26)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>user</td>
+        <td><code>direct user input</code></td>
+        <td>intake</td>
+        <td>—</td>
+        <td>taxpayer<br><span class="muted">2026-10-25 20:22 UTC</span></td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-11a">11a</a></td>
+        <td>Adjusted gross income</td>
+        <td class="amount">    <span class="prov" id="prov-11a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-11a" aria-label="$46,648.01 — show provenance">$46,648.01</span>
+      <span class="prov-card" id="card-11a" role="tooltip">
+        <strong class="title">Line 11a — Adjusted gross income</strong>
+        <dl>
+          <dt>Amount</dt><dd>$46,648.01</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.subtract</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;a&#34;: 46648.01,
+  &#34;b&#34;: 0.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-9">9</a>, <a href="#line-10">10</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.subtract</code></td>
+        <td><a href="#line-9">9</a>, <a href="#line-10">10</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-12d">12d</a></td>
+        <td>Age / blindness boxes checked</td>
+        <td class="amount">    <span class="prov" id="prov-12d">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-12d" aria-label="1 box checked — show provenance">1 box checked</span>
+      <span class="prov-card" id="card-12d" role="tooltip">
+        <strong class="title">Line 12d — Age / blindness boxes checked</strong>
+        <dl>
+          <dt>Amount</dt><dd>1 box checked</dd>
+          <dt>Source kind</dt><dd>chart</dd>
+          <dt>Method</dt><dd><code>tax_math.count_12d_boxes</code></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;taxpayer_65&#34;: true,
+  &#34;taxpayer_blind&#34;: false,
+  &#34;spouse_65&#34;: false,
+  &#34;spouse_blind&#34;: false
+}</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>REF-SD-3</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>chart</td>
+        <td><code>tax_math.count_12d_boxes</code></td>
+        <td>intake</td>
+        <td>REF-SD-3</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-12e">12e</a></td>
+        <td>Standard deduction</td>
+        <td class="amount">    <span class="prov" id="prov-12e">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-12e" aria-label="$17,750.00 — show provenance">$17,750.00</span>
+      <span class="prov-card" id="card-12e" role="tooltip">
+        <strong class="title">Line 12e — Standard deduction</strong>
+        <dl>
+          <dt>Amount</dt><dd>$17,750.00</dd>
+          <dt>Source kind</dt><dd>chart</dd>
+          <dt>Method</dt><dd><code>tax_math.standard_deduction</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;boxes_checked&#34;: 1,
+  &#34;base&#34;: 15750.0,
+  &#34;per_box&#34;: 2000.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-12d">12d</a></dd>
+          <dt>Citations</dt><dd>REF-SD-1, REF-SD-2</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>chart</td>
+        <td><code>tax_math.standard_deduction</code></td>
+        <td><a href="#line-12d">12d</a></td>
+        <td>REF-SD-1, REF-SD-2</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-13b">13b</a></td>
+        <td>Additional deductions (Schedule 1-A)</td>
+        <td class="amount">    <span class="prov" id="prov-13b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-13b" aria-label="$6,000.00 — show provenance">$6,000.00</span>
+      <span class="prov-card" id="card-13b" role="tooltip">
+        <strong class="title">Line 13b — Additional deductions (Schedule 1-A)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$6,000.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.senior_deduction</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;magi&#34;: 46648.01,
+  &#34;qualifying_persons&#34;: 1,
+  &#34;threshold&#34;: 75000.0,
+  &#34;excess_magi&#34;: 0.0,
+  &#34;reduction_per_person&#34;: 0.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-11a">11a</a>, <a href="#line-12d">12d</a></dd>
+          <dt>Citations</dt><dd>REF-SR-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.senior_deduction</code></td>
+        <td><a href="#line-11a">11a</a>, <a href="#line-12d">12d</a></td>
+        <td>REF-SR-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-14">14</a></td>
+        <td>Total deductions</td>
+        <td class="amount">    <span class="prov" id="prov-14">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-14" aria-label="$23,750.00 — show provenance">$23,750.00</span>
+      <span class="prov-card" id="card-14" role="tooltip">
+        <strong class="title">Line 14 — Total deductions</strong>
+        <dl>
+          <dt>Amount</dt><dd>$23,750.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;12e&#34;,
+    &#34;13b&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-12e">12e</a>, <a href="#line-13b">13b</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-12e">12e</a>, <a href="#line-13b">13b</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-15">15</a></td>
+        <td>Taxable income</td>
+        <td class="amount">    <span class="prov" id="prov-15">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-15" aria-label="$22,898.01 — show provenance">$22,898.01</span>
+      <span class="prov-card" id="card-15" role="tooltip">
+        <strong class="title">Line 15 — Taxable income</strong>
+        <dl>
+          <dt>Amount</dt><dd>$22,898.01</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.nonnegative_difference</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;a&#34;: 46648.01,
+  &#34;b&#34;: 23750.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-11a">11a</a>, <a href="#line-14">14</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.nonnegative_difference</code></td>
+        <td><a href="#line-11a">11a</a>, <a href="#line-14">14</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-16">16</a></td>
+        <td>Tax (rate schedule)</td>
+        <td class="amount">    <span class="prov" id="prov-16">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-16" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-16" role="tooltip">
+        <strong class="title">Line 16 — Tax (rate schedule)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>rate-schedule</dd>
+          <dt>Method</dt><dd><code>tax_math.income_tax</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;filing_status&#34;: &#34;single&#34;,
+  &#34;taxable_income&#34;: 22898.01,
+  &#34;brackets&#34;: [
+    {
+      &#34;from&#34;: 0.0,
+      &#34;to&#34;: 11925.0,
+      &#34;rate&#34;: 0.1,
+      &#34;tax&#34;: 1192.5
+    },
+    {
+      &#34;from&#34;: 11925.0,
+      &#34;to&#34;: 22898.01,
+      &#34;rate&#34;: 0.12,
+      &#34;tax&#34;: 1316.76
+    }
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-15">15</a></dd>
+          <dt>Citations</dt><dd>REF-TX-1</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>rate-schedule</td>
+        <td><code>tax_math.income_tax</code></td>
+        <td><a href="#line-15">15</a></td>
+        <td>REF-TX-1</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-17">17</a></td>
+        <td>Amount from Schedule 2, line 3</td>
+        <td class="amount">    <span class="prov" id="prov-17">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-17" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-17" role="tooltip">
+        <strong class="title">Line 17 — Amount from Schedule 2, line 3</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>user</td>
+        <td><code>direct user input</code></td>
+        <td>intake</td>
+        <td>—</td>
+        <td>taxpayer<br><span class="muted">2026-10-25 20:22 UTC</span></td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-18">18</a></td>
+        <td>Add lines 16 and 17</td>
+        <td class="amount">    <span class="prov" id="prov-18">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-18" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-18" role="tooltip">
+        <strong class="title">Line 18 — Add lines 16 and 17</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;16&#34;,
+    &#34;17&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-16">16</a>, <a href="#line-17">17</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-16">16</a>, <a href="#line-17">17</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-19">19</a></td>
+        <td>Child tax credit / credit for other dependents</td>
+        <td class="amount">    <span class="prov" id="prov-19">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-19" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-19" role="tooltip">
+        <strong class="title">Line 19 — Child tax credit / credit for other dependents</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>no credit claimed in profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>no credit claimed in profile</code></td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-20">20</a></td>
+        <td>Amount from Schedule 3, line 8</td>
+        <td class="amount">    <span class="prov" id="prov-20">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-20" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-20" role="tooltip">
+        <strong class="title">Line 20 — Amount from Schedule 3, line 8</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>user</td>
+        <td><code>direct user input</code></td>
+        <td>intake</td>
+        <td>—</td>
+        <td>taxpayer<br><span class="muted">2026-10-25 20:22 UTC</span></td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-21">21</a></td>
+        <td>Add lines 19 and 20</td>
+        <td class="amount">    <span class="prov" id="prov-21">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-21" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-21" role="tooltip">
+        <strong class="title">Line 21 — Add lines 19 and 20</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;19&#34;,
+    &#34;20&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-19">19</a>, <a href="#line-20">20</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-19">19</a>, <a href="#line-20">20</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-22">22</a></td>
+        <td>Subtract line 21 from line 18</td>
+        <td class="amount">    <span class="prov" id="prov-22">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-22" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-22" role="tooltip">
+        <strong class="title">Line 22 — Subtract line 21 from line 18</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.nonnegative_difference</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;a&#34;: 2509.26,
+  &#34;b&#34;: 0.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-18">18</a>, <a href="#line-21">21</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.nonnegative_difference</code></td>
+        <td><a href="#line-18">18</a>, <a href="#line-21">21</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-23">23</a></td>
+        <td>Other taxes (Schedule 2, line 21)</td>
+        <td class="amount">    <span class="prov" id="prov-23">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-23" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-23" role="tooltip">
+        <strong class="title">Line 23 — Other taxes (Schedule 2, line 21)</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd><dt>Note</dt><dd>not provided; treated as 0</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>user</td>
+        <td><code>direct user input</code></td>
+        <td>intake</td>
+        <td>—</td>
+        <td>taxpayer<br><span class="muted">2026-10-25 20:22 UTC</span></td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-24">24</a></td>
+        <td>Total tax</td>
+        <td class="amount">    <span class="prov" id="prov-24">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-24" aria-label="$2,509.26 — show provenance">$2,509.26</span>
+      <span class="prov-card" id="card-24" role="tooltip">
+        <strong class="title">Line 24 — Total tax</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,509.26</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;22&#34;,
+    &#34;23&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-22">22</a>, <a href="#line-23">23</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-22">22</a>, <a href="#line-23">23</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-25a">25a</a></td>
+        <td>Federal income tax withheld from W-2</td>
+        <td class="amount">    <span class="prov" id="prov-25a">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25a" aria-label="$1,210.00 — show provenance">$1,210.00</span>
+      <span class="prov-card" id="card-25a" role="tooltip">
+        <strong class="title">Line 25a — Federal income tax withheld from W-2</strong>
+        <dl>
+          <dt>Amount</dt><dd>$1,210.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    1210.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 2&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-w2-image-1">w2-image-1</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-w2-image-1">w2-image-1</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-25b">25b</a></td>
+        <td>Federal income tax withheld from 1099</td>
+        <td class="amount">    <span class="prov" id="prov-25b">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25b" aria-label="$900.00 — show provenance">$900.00</span>
+      <span class="prov-card" id="card-25b" role="tooltip">
+        <strong class="title">Line 25b — Federal income tax withheld from 1099</strong>
+        <dl>
+          <dt>Amount</dt><dd>$900.00</dd>
+          <dt>Source kind</dt><dd>document</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;amounts&#34;: [
+    900.0,
+    0.0
+  ],
+  &#34;boxes&#34;: [
+    &#34;Box 4 (1099-R)&#34;,
+    &#34;Box 6 (SSA-1099)&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#doc-1099r">1099r</a>, <a href="#doc-ssa1099">ssa1099</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>document</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#doc-1099r">1099r</a>, <a href="#doc-ssa1099">ssa1099</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-25c">25c</a></td>
+        <td>Federal income tax withheld, other forms</td>
+        <td class="amount">    <span class="prov" id="prov-25c">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25c" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-25c" role="tooltip">
+        <strong class="title">Line 25c — Federal income tax withheld, other forms</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>none in profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>none in profile</code></td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-25d">25d</a></td>
+        <td>Total federal income tax withheld</td>
+        <td class="amount">    <span class="prov" id="prov-25d">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-25d" aria-label="$2,110.00 — show provenance">$2,110.00</span>
+      <span class="prov-card" id="card-25d" role="tooltip">
+        <strong class="title">Line 25d — Total federal income tax withheld</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,110.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;25a&#34;,
+    &#34;25b&#34;,
+    &#34;25c&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-25a">25a</a>, <a href="#line-25b">25b</a>, <a href="#line-25c">25c</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-25a">25a</a>, <a href="#line-25b">25b</a>, <a href="#line-25c">25c</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-26">26</a></td>
+        <td>2025 estimated tax payments</td>
+        <td class="amount">    <span class="prov" id="prov-26">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-26" aria-label="$500.00 — show provenance">$500.00</span>
+      <span class="prov-card" id="card-26" role="tooltip">
+        <strong class="title">Line 26 — 2025 estimated tax payments</strong>
+        <dl>
+          <dt>Amount</dt><dd>$500.00</dd>
+          <dt>Source kind</dt><dd>user</dd>
+          <dt>Method</dt><dd><code>direct user input</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>intake</dd>
+          <dt>Citations</dt><dd>none</dd>
+<dt>Entered by</dt><dd>taxpayer at 2026-10-25 20:22 UTC</dd>        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>user</td>
+        <td><code>direct user input</code></td>
+        <td>intake</td>
+        <td>—</td>
+        <td>taxpayer<br><span class="muted">2026-10-25 20:22 UTC</span></td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-32">32</a></td>
+        <td>Total other payments and refundable credits</td>
+        <td class="amount">    <span class="prov" id="prov-32">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-32" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-32" role="tooltip">
+        <strong class="title">Line 32 — Total other payments and refundable credits</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>no refundable credits in profile</code></dd>
+          <dt>Inputs</dt><dd><pre>—</pre></dd>
+          <dt>Sources</dt><dd>none</dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>no refundable credits in profile</code></td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-33">33</a></td>
+        <td>Total payments</td>
+        <td class="amount">    <span class="prov" id="prov-33">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-33" aria-label="$2,610.00 — show provenance">$2,610.00</span>
+      <span class="prov-card" id="card-33" role="tooltip">
+        <strong class="title">Line 33 — Total payments</strong>
+        <dl>
+          <dt>Amount</dt><dd>$2,610.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.sum_amounts</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;lines&#34;: [
+    &#34;25d&#34;,
+    &#34;26&#34;,
+    &#34;32&#34;
+  ]
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-25d">25d</a>, <a href="#line-26">26</a>, <a href="#line-32">32</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.sum_amounts</code></td>
+        <td><a href="#line-25d">25d</a>, <a href="#line-26">26</a>, <a href="#line-32">32</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-34">34</a></td>
+        <td>Overpaid</td>
+        <td class="amount">    <span class="prov" id="prov-34">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-34" aria-label="$100.74 — show provenance">$100.74</span>
+      <span class="prov-card" id="card-34" role="tooltip">
+        <strong class="title">Line 34 — Overpaid</strong>
+        <dl>
+          <dt>Amount</dt><dd>$100.74</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.settle</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;total_tax&#34;: 2509.26,
+  &#34;total_payments&#34;: 2610.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-33">33</a>, <a href="#line-24">24</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.settle</code></td>
+        <td><a href="#line-33">33</a>, <a href="#line-24">24</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td class="num"><a href="#line-37">37</a></td>
+        <td>Amount you owe</td>
+        <td class="amount">    <span class="prov" id="prov-37">
+      <span class="amt" tabindex="0" role="button" aria-describedby="card-37" aria-label="$0.00 — show provenance">$0.00</span>
+      <span class="prov-card" id="card-37" role="tooltip">
+        <strong class="title">Line 37 — Amount you owe</strong>
+        <dl>
+          <dt>Amount</dt><dd>$0.00</dd>
+          <dt>Source kind</dt><dd>computed</dd>
+          <dt>Method</dt><dd><code>tax_math.settle</code> <span class="muted">via mcp-stdio</span></dd>
+          <dt>Inputs</dt><dd><pre>{
+  &#34;total_tax&#34;: 2509.26,
+  &#34;total_payments&#34;: 2610.0
+}</pre></dd>
+          <dt>Sources</dt><dd><a href="#line-24">24</a>, <a href="#line-33">33</a></dd>
+          <dt>Citations</dt><dd>none</dd>
+        </dl>
+        <span class="hint">Click the amount to pin this card; press Escape to close.</span>
+      </span>
+    </span>
+</td>
+        <td>computed</td>
+        <td><code>tax_math.settle</code></td>
+        <td><a href="#line-24">24</a>, <a href="#line-33">33</a></td>
+        <td>—</td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Documents read</h2>
+  <div class="doc" id="doc-w2-image-1">
+    <h3 style="margin-top:0">w2-image-1 <span class="kind">W-2</span>
+      <span class="muted" style="font-weight:400;font-size:.9rem"> · read via vision:claude-sonnet-5-5 · confidence 0.97 · w2_image_1.jpg · v1</span></h3>
+    <table>
+      <thead><tr><th>Field</th><th>Box</th><th>Value as printed</th></tr></thead>
+      <tbody><tr><td><code>employee_name</code></td><td>Box e</td><td>Eleanor M Whitfield</td></tr><tr><td><code>employee_ssn_last4</code></td><td>Box a</td><td>5678</td></tr><tr><td><code>employer_name</code></td><td>Box c</td><td>Tompkins Public Library</td></tr><tr><td><code>employer_ein</code></td><td>Box b</td><td>16-1234567</td></tr><tr><td><code>wages</code></td><td>Box 1</td><td>18400.0</td></tr><tr><td><code>federal_withheld</code></td><td>Box 2</td><td>1210.0</td></tr><tr><td><code>social_security_wages</code></td><td>Box 3</td><td>18400.0</td></tr><tr><td><code>social_security_tax</code></td><td>Box 4</td><td>1140.8</td></tr><tr><td><code>medicare_wages</code></td><td>Box 5</td><td>18400.0</td></tr><tr><td><code>medicare_tax</code></td><td>Box 6</td><td>266.8</td></tr><tr><td><code>tax_year</code></td><td>form header</td><td>2025</td></tr></tbody>
+    </table>
+<ul class="issues"><li>Taxpayer&#39;s claim that this is a W-2 is confirmed by the form title &#39;Form W-2 Wage and Tax Statement 2025&#39;.</li><li>The form is marked as a synthetic test document, not a real form.</li><li>The Copy B header text is cut off at the right edge of the image (reads &#39;To Be Filed With Employee&#39;s FEDERAL Tax Ret...&#39;). This does not affect any field.</li><li>Boxes 7, 8, 9, 10, 11 and 12a are blank. They are not part of the requested field list, so they are not reported.</li></ul>  </div>
+  <div class="doc" id="doc-1099int">
+    <h3 style="margin-top:0">1099int <span class="kind">1099-INT</span>
+      <span class="muted" style="font-weight:400;font-size:.9rem"> · read via fixture · confidence 1.0 · 1099int.json · v1</span></h3>
+    <table>
+      <thead><tr><th>Field</th><th>Box</th><th>Value as printed</th></tr></thead>
+      <tbody><tr><td><code>recipient_name</code></td><td>Recipient</td><td>Eleanor M Whitfield</td></tr><tr><td><code>payer_name</code></td><td>Payer</td><td>Finger Lakes Savings</td></tr><tr><td><code>interest_income</code></td><td>Box 1</td><td>842.17</td></tr><tr><td><code>federal_withheld</code></td><td>Box 4</td><td>0.0</td></tr><tr><td><code>tax_exempt_interest</code></td><td>Box 8</td><td>0.0</td></tr><tr><td><code>tax_year</code></td><td>form header</td><td>2025</td></tr></tbody>
+    </table>
+  </div>
+  <div class="doc" id="doc-1099r">
+    <h3 style="margin-top:0">1099r <span class="kind">1099-R</span>
+      <span class="muted" style="font-weight:400;font-size:.9rem"> · read via fixture · confidence 1.0 · 1099r.json · v1</span></h3>
+    <table>
+      <thead><tr><th>Field</th><th>Box</th><th>Value as printed</th></tr></thead>
+      <tbody><tr><td><code>recipient_name</code></td><td>Recipient</td><td>Eleanor M Whitfield</td></tr><tr><td><code>payer_name</code></td><td>Payer</td><td>Tompkins County Retirement System</td></tr><tr><td><code>gross_distribution</code></td><td>Box 1</td><td>14200.0</td></tr><tr><td><code>taxable_amount</code></td><td>Box 2a</td><td>14200.0</td></tr><tr><td><code>taxable_not_determined</code></td><td>Box 2b</td><td>False</td></tr><tr><td><code>federal_withheld</code></td><td>Box 4</td><td>900.0</td></tr><tr><td><code>distribution_code</code></td><td>Box 7</td><td>7</td></tr><tr><td><code>ira_sep_simple</code></td><td>Box 7 IRA/SEP/SIMPLE</td><td>False</td></tr><tr><td><code>qcd_amount</code></td><td>QCD (noted)</td><td></td></tr><tr><td><code>tax_year</code></td><td>form header</td><td>2025</td></tr></tbody>
+    </table>
+  </div>
+  <div class="doc" id="doc-ssa1099">
+    <h3 style="margin-top:0">ssa1099 <span class="kind">SSA-1099</span>
+      <span class="muted" style="font-weight:400;font-size:.9rem"> · read via fixture · confidence 1.0 · ssa1099.json · v1</span></h3>
+    <table>
+      <thead><tr><th>Field</th><th>Box</th><th>Value as printed</th></tr></thead>
+      <tbody><tr><td><code>recipient_name</code></td><td>Box 1</td><td>Eleanor M Whitfield</td></tr><tr><td><code>net_benefits</code></td><td>Box 5</td><td>21600.0</td></tr><tr><td><code>federal_withheld</code></td><td>Box 6</td><td>0.0</td></tr><tr><td><code>tax_year</code></td><td>form header</td><td>2025</td></tr></tbody>
+    </table>
+  </div>
+
+  <h2>Eligibility determinations</h2>
+  <table>
+    <thead><tr><th>Claim</th><th>Result</th><th>Citation</th></tr></thead>
+    <tbody><tr><td>Filing status &#39;single&#39; is one of the five in-scope statuses</td><td><span class="pill ok">yes</span></td><td><code>REF-FS-1</code></td></tr><tr><td>Taxpayer (or a spouse on a joint return) was born before 2 January 1961</td><td><span class="pill ok">yes</span></td><td><code>REF-EL-1</code></td></tr><tr><td>Boxes checked on line 12d</td><td>1</td><td><code>REF-SD-3</code></td></tr><tr><td>Standard Deduction Chart applies</td><td><span class="pill ok">yes</span></td><td><code>REF-SD-4</code></td></tr><tr><td>Everything declared or uploaded is within the in-scope profile</td><td><span class="pill ok">yes</span></td><td><code>REF-SC-1</code></td></tr><tr><td>Schedules that apply</td><td>[&#39;Schedule 1-A&#39;]</td><td><code>REF-SC-1</code></td></tr></tbody>
+  </table>
+
+  <h2>Review</h2>
+  <h3>Round 1 — <span class="pill ok">passed</span> <span class="muted" style="font-weight:400;font-size:.9rem">rules+claude-opus-5-5 · 2026-10-25 20:23 UTC</span></h3>
+<p class="muted">No findings. Every line was recomputed independently and agreed.</p>
+
+  <p class="banner" style="margin-top:2.5rem">DRAFT — prepared by SilverFile for review by a Kushim preparer. Not filed. Not advice.</p>
+</div>
+<script>
+  // Tiny: click pins a provenance card open (hover and keyboard focus already work without this).
+  document.addEventListener('click', function (e) {
+    var amt = e.target.closest('.amt');
+    document.querySelectorAll('.prov.pinned').forEach(function (p) { if (!amt || p !== amt.parentElement) p.classList.remove('pinned'); });
+    if (amt) amt.parentElement.classList.toggle('pinned');
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.prov.pinned').forEach(function (p) { p.classList.remove('pinned'); }); });
+</script>
+</body>
+</html>
