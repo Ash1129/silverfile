@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from .. import seed, service
+from . import gate
 from ..forms.render import jinja_env, render_html, render_pdf, status_label
 from ..memory import session_summary
 
@@ -45,6 +46,42 @@ def create_app() -> FastAPI:
 
     def page(request: Request, name: str, status_code: int = 200, **ctx: Any) -> HTMLResponse:
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
+
+    # ------------------------------------------------------------ key gate (shared copies only; see gate.py)
+    app.add_middleware(gate.KeyGate, render_gate=lambda request: page(request, "key.html"))
+
+    @app.get("/key", response_class=HTMLResponse)
+    async def key_page(request: Request):
+        if not gate.gate_enabled():
+            return RedirectResponse("/", status_code=303)
+        return page(request, "key.html")
+
+    @app.post("/key")
+    async def key_submit(request: Request, api_key: str = Form("")):
+        if not gate.gate_enabled():
+            return RedirectResponse("/", status_code=303)
+        try:
+            key = await run_in_threadpool(gate.validate_key, api_key)
+        except ValueError as e:
+            return page(request, "key.html", status_code=400, error=str(e))
+        gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
+        response = RedirectResponse("/", status_code=303)
+        gate.set_session_cookie(response, request, gate.start_session(key))
+        return response
+
+    @app.post("/key/forget")
+    async def key_forget(request: Request):
+        gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
+        response = RedirectResponse("/key" if gate.gate_enabled() else "/", status_code=303)
+        gate.clear_session_cookie(response)
+        return response
+
+    @app.exception_handler(gate.AuthFailed)
+    async def _key_rejected(request: Request, exc: gate.AuthFailed):
+        gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
+        response = page(request, "key.html", status_code=401, error="Anthropic rejected your key mid-run (revoked, or out of credit). Enter a working key to continue.")
+        gate.clear_session_cookie(response)
+        return response
 
     @app.exception_handler(service.ServiceError)
     async def _bad_request(request: Request, exc: service.ServiceError):

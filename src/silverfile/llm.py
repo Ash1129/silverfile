@@ -1,10 +1,18 @@
 """One thin door to the model. Every call returns text plus token counts so the
 agents can log usage (docs/metrics.md) and the context-window strategy can be
 measured. With no API key the agents use their offline fallbacks instead.
+
+The key comes from one of two places: the environment (ANTHROPIC_API_KEY, the
+local setup) or `request_key`, a context variable the dashboard's key gate sets
+for the duration of a request so that a visitor's own key is used for their
+runs and nothing else. The context variable wins. Context is copied into the
+threads the graph runs on (starlette's run_in_threadpool and LangGraph's
+executor both do that), so the agents need no plumbing.
 """
 from __future__ import annotations
 
 import base64
+import contextvars
 import json
 import mimetypes
 import re
@@ -44,23 +52,37 @@ class LLMResult:
             return json.loads(t[start:end]) if end else None
 
 
-_client = None
+request_key: contextvars.ContextVar[str | None] = contextvars.ContextVar("silverfile_request_key", default=None)
+
+_clients: dict[str, Any] = {}
+
+
+def current_key() -> str | None:
+    """The key this call should use: the request's own if the gate set one, else the environment's."""
+    return request_key.get() or settings().api_key
 
 
 def client():
-    global _client
-    if _client is None:
+    key = current_key()
+    if not key:
+        raise RuntimeError("no API key: SilverFile is in offline mode")
+    if key not in _clients:
         import anthropic
 
         import os
 
-        headers = {"anthropic-workspace-id": os.environ["ANTHROPIC_WORKSPACE_ID"]} if os.environ.get("ANTHROPIC_WORKSPACE_ID") else {}
-        _client = anthropic.Anthropic(api_key=settings().api_key, default_headers=headers)
-    return _client
+        # The workspace header belongs to the local key; a visitor's key is billed to their own account.
+        headers = {"anthropic-workspace-id": os.environ["ANTHROPIC_WORKSPACE_ID"]} if os.environ.get("ANTHROPIC_WORKSPACE_ID") and key == settings().api_key else {}
+        _clients[key] = anthropic.Anthropic(api_key=key, default_headers=headers)
+    return _clients[key]
+
+
+def forget_client(key: str) -> None:
+    _clients.pop(key, None)
 
 
 def available() -> bool:
-    return not settings().offline
+    return bool(current_key())
 
 
 def estimate_tokens(text: str) -> int:

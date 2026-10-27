@@ -1,7 +1,9 @@
 # One-click deploy to Render (https://render.com): New > Blueprint > pick this repo.
-# No ANTHROPIC_API_KEY is set here on purpose: the public copy runs in offline mode
-# (scripted intake, sidecar extraction, rule-only review) with the mock fixtures.
-# The key stays in your local .env and is used only by `python run.py serve` at home.
+# No ANTHROPIC_API_KEY is set here on purpose. With SILVERFILE_REQUIRE_KEY=1 the shared
+# copy asks each visitor for their own Anthropic key (see src/silverfile/dashboard/gate.py)
+# and runs the live models on it; the owner's key stays in the local .env. Drop that
+# variable to run the shared copy offline instead (scripted intake, sidecar extraction,
+# rule-only review on the mock fixtures).
 services:
   - type: web
     name: silverfile
@@ -13,3 +15,7 @@ services:
         value: /data
       - key: SILVERFILE_SEED_DEMO   # seed six demo returns on first start so the list is not empty
         value: "1"
+      - key: SILVERFILE_REQUIRE_KEY  # visitors enter their own Anthropic key; live models on their account
+        value: "1"
+      - key: FORWARDED_ALLOW_IPS    # trust Render's proxy headers so the session cookie is marked Secure
+        value: "*"

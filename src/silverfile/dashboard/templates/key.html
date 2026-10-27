@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Your API key{% endblock %}
+{% block content %}
+<section class="card gate">
+  <h1>Use SilverFile with your own Anthropic key</h1>
+  <p>This shared copy runs the live models: Claude reads the taxpayer's answers, the document images and the draft for review. It has no key of its own. Paste yours and the dashboard uses it for your runs only.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/key" class="gate-form" autocomplete="off">
+    <label for="api_key">Anthropic API key</label>
+    <input id="api_key" name="api_key" type="password" required placeholder="sk-ant-…" spellcheck="false" autocapitalize="off">
+    <button class="button primary" type="submit">Continue</button>
+  </form>
+  <ul class="muted small">
+    <li>Get a key at <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com/settings/keys</a>. Model calls are billed to that key's account.</li>
+    <li>The key is checked once, then held in this server's memory for your browser session (12 hours, or until you click <em>Forget my key</em>). It is never written to disk or logs and never shown on a page.</li>
+    <li>The returns already in the list were prepared offline when the server started; opening them costs nothing. New returns, answers and uploads call the models.</li>
+  </ul>
+</section>
+{% endblock %}

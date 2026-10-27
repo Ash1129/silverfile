@@ -14,7 +14,7 @@ The orchestrator, eligibility, computation, the escalation gate and the `tax_mat
 
 Prompts are in `src/silverfile/agents/*.py` next to the code that uses them. Token counts per model call are recorded in the return state (`token_log`) and shown on the dashboard.
 
-Without `ANTHROPIC_API_KEY` the system runs offline with a scripted intake parser, sidecar JSON for document images and rule-only review, which is how the test suite runs.
+Without `ANTHROPIC_API_KEY` the system runs offline with a scripted intake parser, sidecar JSON for document images and rule-only review, which is how the test suite runs. A shared copy started with `SILVERFILE_REQUIRE_KEY=1` runs the models on each visitor's own key, entered once per browser session and held only in the server's memory (see `src/silverfile/dashboard/gate.py`).
 
 ## In the making of it
 

@@ -11,7 +11,7 @@
 <header class="top">
   <div class="wrap">
     <a class="brand" href="/">SilverFile <span>Kushim preparer dashboard</span></a>
-    <nav><a href="/">All returns</a></nav>
+    <nav><a href="/">All returns</a>{% if request.state.key_session %}<form method="post" action="/key/forget"><button class="linkish" type="submit" title="Drop your API key from this server's memory">Forget my key</button></form>{% endif %}</nav>
   </div>
 </header>
 <div class="draft-strip">{{ BANNER }}</div>
