@@ -10,6 +10,7 @@
  "spouse": {
   "first_name": "Margaret",
   "last_name": "Benson",
+  "ssn": "945-67-8901",
   "dob": "1951-06-21",
   "blind": false,
   "date_of_death": "2025-05-09"
