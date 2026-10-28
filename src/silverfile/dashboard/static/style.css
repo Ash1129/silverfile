@@ -105,3 +105,16 @@ header.top nav form.inline button.linkish { margin-left: 1rem; }
 .seal.bad { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
 .button.danger { background: var(--red); color: #fff; border-color: var(--red); }
 .taxpayer-chat { max-width: 46rem; margin: 0 auto; }
+/* agent message bus */
+ol.bus { list-style: none; padding: 0; margin: .5rem 0 0; max-height: 28rem; overflow-y: auto; }
+ol.bus li { display: grid; grid-template-columns: 1.8rem 1fr; padding: .4rem 0; border-bottom: 1px dotted var(--rule); }
+ol.bus .seq { color: var(--muted); font-size: .82rem; font-variant-numeric: tabular-nums; padding-top: .1rem; }
+ol.bus .route { font-size: .82rem; }
+ol.bus .detail { font-size: .88rem; color: var(--muted); line-height: 1.4; margin-top: .15rem; overflow-wrap: anywhere; }
+.act { display: inline-block; min-width: 4.6rem; margin-right: .45rem; text-align: center; padding: 0 .4rem; border-radius: 3px; font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; background: var(--tint); border: 1px solid var(--rule); color: var(--muted); }
+.act-request { background: var(--blue-bg); border-color: var(--blue); color: var(--blue); }
+.act-revise, .act-escalate { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
+.act-done, .act-resolve { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.act-violation { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.bus-warn { color: var(--amber); font-weight: 600; }
+.bus-bad { color: var(--red); font-weight: 600; }

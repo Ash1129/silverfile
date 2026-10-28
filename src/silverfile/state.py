@@ -6,6 +6,9 @@ Design notes
   per document) and each branch writes its own record keyed by document id, so
   concurrent writes never clobber each other. A second write for the same id
   with a higher `version` wins; an equal version is kept and flagged.
+- `mailbox` uses `merge_messages`: the inter-agent message bus, deduplicated
+  by content-addressed id and ordered by a logical clock, so the parallel
+  extraction branches can post to it at once.
 - `handoffs`, `escalations`, `review_history`, `token_log`, `events` are
   append-only lists (operator.add).
 - Everything else is last-writer-wins and is only written by one agent at a
@@ -169,6 +172,34 @@ class TokenEvent(TypedDict, total=False):
     at: str
 
 
+class AgentMessage(TypedDict, total=False):
+    """One envelope on the inter-agent message bus (see comms/protocol.py)."""
+    id: str  # content-addressed: the same message delivered twice is stored once
+    seq: int  # logical clock; parallel branches share a seq and are ordered by id
+    thread: str  # correlation id: a request, its reply and any follow-ups share it
+    in_reply_to: str | None
+    sender: str
+    recipient: str
+    performative: str  # request | inform | revise | done | escalate | resolve | refuse | violation | ask | answer
+    topic: str
+    body: dict[str, Any]
+    at: str
+
+
+def merge_messages(left: list[AgentMessage] | None, right: list[AgentMessage] | None) -> list[AgentMessage]:
+    """Order-independent append for the message bus (handles concurrent writes).
+
+    Messages are deduplicated by id and kept sorted by (seq, id). Parallel
+    extraction branches all write at the same seq, so whichever branch finishes
+    first, the merged log is identical. A redelivered message (same id) is a
+    no-op, which makes delivery idempotent across checkpoint replays.
+    """
+    by_id: dict[str, AgentMessage] = {m["id"]: m for m in (left or [])}
+    for m in right or []:
+        by_id.setdefault(m["id"], m)
+    return sorted(by_id.values(), key=lambda m: (int(m.get("seq", 0)), m["id"]))
+
+
 def merge_documents(left: dict[str, ExtractedDocument] | None, right: dict[str, ExtractedDocument] | None) -> dict[str, ExtractedDocument]:
     """Order-independent merge keyed by document id (handles concurrent writes).
 
@@ -248,6 +279,8 @@ class ReturnState(TypedDict, total=False):
     handoffs: Annotated[list[str], operator.add]
     loop_guard_tripped: bool
     next_agent: str | None
+    # inter-agent communication: every handoff, result, work order and escalation as a typed envelope
+    mailbox: Annotated[list[AgentMessage], merge_messages]
     # memory / telemetry
     summary: str | None
     token_log: Annotated[list[TokenEvent], operator.add]

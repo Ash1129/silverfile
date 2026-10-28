@@ -101,6 +101,21 @@
     </section>
 
     <section class="card">
+      <h2>Agent messages</h2>
+      <p class="muted small">{{ bus.count }} messages{% if bus.in_flight %} · 1 in flight to <code>{{ bus.in_flight }}</code>{% endif %} ·
+        <span class="{{ 'bus-bad' if bus.unanswered else '' }}">{{ bus.unanswered }} unanswered</span> ·
+        <span class="{{ 'bus-warn' if bus.open_orders else '' }}">{{ bus.open_orders }} open work order{{ '' if bus.open_orders == 1 else 's' }}</span> ·
+        <span class="{{ 'bus-bad' if bus.violations else '' }}">{{ bus.violations }} violation{{ '' if bus.violations == 1 else 's' }}</span> ·
+        <a href="/returns/{{ rid }}/messages.json">JSON</a></p>
+      {% if bus.rows %}
+      <ol class="bus">{% for m in bus.rows %}
+        <li><span class="seq">{{ m.seq }}</span><div><span class="act act-{{ m.performative }}">{{ m.performative }}</span><code class="route">{{ m.sender }} → {{ m.recipient }}</code>
+          <div class="detail">{{ m.detail | mask }}</div></div></li>{% endfor %}
+      </ol>
+      {% else %}<p class="muted">No messages yet.</p>{% endif %}
+    </section>
+
+    <section class="card">
       <h2>Token log</h2>
       {% if state.token_log %}
       <table class="list">

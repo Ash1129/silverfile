@@ -11,6 +11,8 @@ from typing import Any
 
 from langgraph.types import Send
 
+from ..comms.bus import escalate_message, latest_request, open_work_orders, request_for, unanswered_requests
+from ..comms.protocol import WORKERS, make_message, next_seq
 from ..provenance import now_iso
 from ..security.validate import faults_allowed
 from ..state import LOOP_PATTERN_REPEATS, MAX_HANDOFFS, MAX_REVIEW_ROUNDS, Escalation, ReturnState
@@ -82,6 +84,11 @@ def decide_next(state: ReturnState) -> str:
         return "finalize"
     if state.get("revise_target") == "human" or int(state.get("review_round", 0)) >= MAX_REVIEW_ROUNDS:
         return "review_unresolved"
+    # work orders still open on the bus: Review may have found problems for more than one agent, and
+    # revise_target names only the first. Each addressee acts before the return goes back to review.
+    for agent in ("extraction", "eligibility", "computation"):
+        if open_work_orders(state, agent):
+            return agent
     return "review"
 
 
@@ -104,11 +111,35 @@ def orchestrator_node(state: ReturnState) -> dict[str, Any]:
         reasons = state.get("revise_reasons") or []
         out["escalations"] = [Escalation(id=f"esc-review-{state.get('review_round', 0)}", kind="review_unresolved", reason=f"Review did not pass after {state.get('review_round', 0)} round(s). Findings: " + "; ".join(reasons[:6]), raised_by="review", raised_at=now_iso(), details={"findings": reasons}, status="open", resolution=None, resolved_by=None, resolved_at=None)]
         out["status"] = "waiting_human"
-    if nxt == "extraction" and state.get("revise_target") == "extraction":
+    if nxt == "extraction" and (state.get("revise_target") == "extraction" or open_work_orders(state, "extraction")):
         out["extraction_done"] = False
     if nxt in ("computation", "eligibility", "extraction") and state.get("revise_target"):
         out["revise_target"] = None
+    out["mailbox"] = _post(state, nxt, out)
     return out
+
+
+def _post(state: ReturnState, nxt: str, out: dict[str, Any]) -> list:
+    """The orchestrator's side of the protocol: flag requests nobody answered, record the
+    escalations it raised itself, then hand off to the next agent with a `request`."""
+    seq = next_seq(state.get("mailbox"))
+    msgs = []
+    flagged = {m["body"].get("request_id") for m in state.get("mailbox") or [] if m["topic"] == "no_reply"}
+    for req in unanswered_requests(state):
+        if req["id"] in flagged:
+            continue
+        msgs.append(make_message(seq, "orchestrator", "human", "violation", "no_reply", {"request_id": req["id"], "agent": req["recipient"]}, thread=req["thread"]))
+        seq += 1
+    for esc in out.get("escalations") or []:
+        msgs.append(escalate_message(seq, "orchestrator", esc))
+        seq += 1
+    target = "finalize" if nxt == "end" else nxt
+    if target in WORKERS:
+        extra = {"review_round": int(state.get("review_round", 0))} if target == "review" else {}
+        if target == "computation":
+            extra["version"] = out.get("computation_version")
+        msgs.append(request_for(state, target, seq, **extra))
+    return msgs
 
 
 def route(state: ReturnState):
@@ -119,7 +150,8 @@ def route(state: ReturnState):
         version = 1 + max([int(d.get("version", 1)) for d in (state.get("extracted") or {}).values()] or [0]) if state.get("extracted") else 1
         if not docs:
             return "aggregate_extraction"
-        return [Send("extract_document", {"document": {**d, "version": version}}) for d in docs]
+        req = latest_request(state, "extraction")  # posted by orchestrator_node just before this edge runs
+        return [Send("extract_document", {"document": {**d, "version": version}, "request": req}) for d in docs]
     if nxt in ("loop_guard", "review_unresolved"):
         return "orchestrator"  # the node already recorded the escalation; re-route to it
     if nxt == "end":
