@@ -28,7 +28,7 @@ WRITES: dict[str, frozenset[str]] = {
     "computation": frozenset({"lines", "provenance", "computation_version", "computation_notes"}),
     "review": frozenset({"review_history", "review_round", "review_passed", "revise_target", "revise_reasons"}),
     "escalation": frozenset({"escalations", "pending_escalation_id", "intake", "eligibility", "review_passed", "revise_target", "halted_reason", "status", "loop_guard_tripped", "review_round"}),
-    "finalize": frozenset({"status", "halted_reason"}),
+    "finalize": frozenset({"status", "halted_reason", "provenance_seal"}),  # the seal is security/integrity.py's, written as the draft completes
 }
 
 READS: dict[str, tuple[str, ...]] = {
