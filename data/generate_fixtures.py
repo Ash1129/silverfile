@@ -89,12 +89,12 @@ CASES = {
     "case2_hitl": {
         "intake": {
             "answering_party": "self", "taxpayer": {"first_name": "Harold", "last_name": "Benson", "ssn": "923-45-6789", "dob": "1949-11-02", "blind": True},
-            "spouse": {"first_name": "Margaret", "last_name": "Benson", "dob": "1951-06-21", "blind": False, "date_of_death": "2025-05-09"}, "married": True, "spouse_died_in_year": True, "filing_status": None, "_filing_status_unsure": True,
+            "spouse": {"first_name": "Margaret", "last_name": "Benson", "ssn": "945-67-8901", "dob": "1951-06-21", "blind": False, "date_of_death": "2025-05-09"}, "married": True, "spouse_died_in_year": True, "filing_status": None, "_filing_status_unsure": True,
             "dependents": [], "can_be_claimed_as_dependent": False, "documents_declared": ["SSA-1099", "1099-R", "1099-DIV"], "other_income_sources": [], "estimated_payments": 0.0, "schedule1_adjustments": 0.0,
             "schedule1_other_income": 0.0, "schedule2_line3": 0.0, "schedule3_line8": 0.0, "refund_account_description": "our joint checking at Cayuga Trust", "refund_account_is_own": True,
             "noted_questions": [], "volunteered_ssn_events": [], "_uploaded": True, "_confirmed": True, "_dependents_done": True,
         },
-        "answers": ["Yes", "Harold Benson", "923-45-6789", "11/02/1949", "Yes, I am legally blind", "Widowed", "Yes, in May", "Margaret Benson", "June 21, 1951", "No", "None", "No", "SSA-1099, a 1099-R from my pension, and a 1099-DIV", "No", "None", "None", "None", "None", "None", "Our joint checking at Cayuga Trust", "Yes", "done", "Yes"],
+        "answers": ["Yes", "Harold Benson", "923-45-6789", "11/02/1949", "Yes, I am legally blind", "Widowed", "Yes, in May", "Margaret Benson", "945-67-8901", "June 21, 1951", "No", "None", "No", "SSA-1099, a 1099-R from my pension, and a 1099-DIV", "No", "None", "None", "None", "None", "None", "Our joint checking at Cayuga Trust", "Yes", "done", "Yes"],
         "w2": None,
         "docs": {
             "ssa1099": {"kind": "SSA-1099", "recipient_name": "Harold J Benson", "net_benefits": 26400.00, "federal_withheld": 1200.0, "tax_year": "2025"},

@@ -30,22 +30,73 @@ from ..security import injection, pii
 from ..state import Escalation, IntakeFacts, ReturnState
 
 SSN_RE = pii.SSN_RE
-ADVICE_RE = re.compile(r"\b(should i|would i pay less|can i deduct|is it better|better to|roth|convert my ira|save on tax|lower my tax|write off|claim .* deduction|file separately to)\b", re.I)
+ADVICE_RE = re.compile(
+    r"\b(should i|should we|would i pay less|would we pay less|would (?:i|we) owe less|can i deduct|is it better|would it be better|better to|"
+    r"would it help|which (?:one |status |option )?(?:is|would be) (?:better|cheaper)|how (?:can|do) (?:i|we) (?:pay|owe) less|"
+    r"roth|convert my ira|save on tax|lower my tax|reduce my tax|minimi[sz]e my tax|write off|claim .* deduction|file separately to)\b", re.I)
 GO_BACK_RE = re.compile(r"\b(go back|change|correct|fix|actually|i meant|earlier i said|wrong)\b", re.I)
 UNSURE_RE = re.compile(r"\b(not sure|don't know|dont know|no idea|unsure|can't remember|cannot remember|i forget)\b", re.I)
-THIRD_PARTY_RE = re.compile(r"\b(my (mother|father|mom|dad|husband|wife|aunt|uncle|grandmother|grandfather|client|neighbor|neighbour)|answering for|on (his|her|their) behalf|i am (his|her|their) (son|daughter|nephew|niece|caregiver|friend|neighbor))\b", re.I)
+
+# Guardrails B: who is answering. Brief §4.4 condition 6 is "a third party answering on the
+# taxpayer's behalf without a stated authority". The trigger is someone *acting for* the
+# taxpayer, not a relative being *mentioned*: "My wife is Mary" (a spouse's name on a joint
+# return) or "my husband handled the taxes" must not pause a return as possible exploitation.
+RELATIVE = (r"(?:mother|father|mom|mum|dad|husband|wife|spouse|aunt|uncle|grandmother|grandfather|grandma|grandpa|"
+            r"grandson|granddaughter|son|daughter|nephew|niece|brother|sister|cousin|friend|neighbou?r|client|caregiver|carer|aide|helper)")
+NON_SPOUSE = RELATIVE.replace("husband|wife|spouse|", "")
+THIRD_PARTY_RE = re.compile(
+    # "I'm answering for my aunt", "typing this for her", "filling it in for my dad"
+    rf"\b(?:answering|typing|speaking|responding|writing|filling (?:this|it) (?:in|out))(?: this| these| it)? (?:for|on behalf of) (?:me|him|her|them|my {RELATIVE})\b"
+    # "I'm doing this for my mother" (not "thanks for doing this for me")
+    rf"|\bdoing (?:this|it|the taxes|the return|her taxes|his taxes) for (?:him|her|them|my {RELATIVE})\b"
+    rf"|\bon (?:his|her|their|my {RELATIVE}'s) behalf\b"
+    # "I'm her daughter", "this is his caregiver"
+    rf"|\b(?:i am|i'm|im|this is) (?:his|her|their) {RELATIVE}\b"
+    # "my daughter is typing this", "my son is helping me answer"
+    rf"|\bmy {RELATIVE} is (?:typing|answering|filling|writing|doing this|doing it|on the keyboard|helping me (?:type|answer|fill))"
+    # "it's my mother's return" (a spouse's return is the taxpayer's own on a joint return)
+    rf"|\bmy {NON_SPOUSE}'s (?:return|taxes)\b",
+    re.I)
+AUTHORITY_RE = re.compile(r"\b(power of attorney|poa|authori[sz]ed|permission|form 2848|guardian|conservator)\b", re.I)
+MENTIONS_OTHER_RE = re.compile(rf"\b{RELATIVE}\b|\bpower of attorney\b|\bpoa\b", re.I)
 DOC_KINDS = {"W-2": ["w-2", "w2", "wage"], "SSA-1099": ["ssa", "social security"], "1099-R": ["1099-r", "1099r", "pension", "annuity", "ira distribution", "retirement"], "1099-INT": ["1099-int", "1099int", "interest"], "1099-DIV": ["1099-div", "1099div", "dividend"], "1099-NEC": ["1099-nec", "nec", "contractor"], "1099-B": ["1099-b", "brokerage", "stock sale"], "1099-MISC": ["1099-misc", "misc"], "K-1": ["k-1", "k1"]}
 FILING_WORDS = {"single": ["single"], "mfj": ["jointly", "joint", "married filing jointly", "mfj", "together"], "mfs": ["separately", "mfs", "separate"], "hoh": ["head of household", "hoh"], "qss": ["surviving spouse", "qualifying widow", "widower", "qss"]}
 MAX_TURNS = 80  # a safety stop on a conversation that never completes
 
+# Guardrails B, plain language: the first time a term appears in a question, a one-line
+# explanation is added right after the sentence that uses it (and never again in that session,
+# so a tired reader is not told the same thing twice). Keys are matched with an optional plural "s".
 GLOSSES = {
-    "standard deduction": "the standard deduction is the fixed amount of income that is not taxed",
-    "filing status": "your filing status is the category the IRS uses for your household, such as single or married filing jointly",
-    "dependents": "a dependent is a child or relative you support and can list on your return",
-    "estimated tax payments": "estimated tax payments are amounts some people send the IRS during the year, often every three months",
-    "adjustments to income": "adjustments to income are a short list of items, such as a deductible IRA contribution, that reduce your income before tax",
-    "withholding": "withholding is tax your employer or payer already sent to the IRS for you",
+    "standard deduction": "The standard deduction is the fixed amount of income that is not taxed.",
+    "legally blind": "Legally blind generally means you can't see better than 20/200 in your better eye even with glasses, or your field of vision is 20 degrees or less.",
+    "filing status": "Your filing status is the category the IRS uses for your household, such as single or married filing jointly.",
+    "dependent": "A dependent is a child or relative you support and can list on your return.",
+    "estimated tax payment": "Estimated tax payments are amounts some people send the IRS during the year, often every three months.",
+    "adjustments to income": "Adjustments to income are a short list of items, such as a deductible IRA contribution or student loan interest, that reduce your income before tax.",
+    "withholding": "Withholding is tax your employer or payer already sent to the IRS for you.",
 }
+# Tax jargon a question must never use (tests/test_intake_dignity.py checks every question).
+JARGON = ("MAGI", "modified adjusted gross income", "AGI", "adjusted gross income", "provisional income", "MFJ", "MFS", "HOH", "QSS", "Schedule 1-A")
+
+
+def add_glosses(text: str, facts: IntakeFacts) -> tuple[str, list[str]]:
+    """The question with a plain-language explanation after the first use of each new term.
+
+    Returns (text, terms explained now). Terms already explained this session are skipped.
+    """
+    done = set(facts.get("_glossed") or [])
+    sentences = re.split(r"(?<=[.?!])\s+", text)
+    added: list[str] = []
+    for term, gloss in GLOSSES.items():
+        if term in done:
+            continue
+        pat = re.compile(rf"\b{re.escape(term)}s?\b", re.I)
+        for i, s in enumerate(sentences):
+            if pat.search(s) and gloss not in sentences:
+                sentences.insert(i + 1, gloss)
+                added.append(term)
+                break
+    return " ".join(sentences), added
 
 
 # ---------------------------------------------------------------- questions
@@ -58,21 +109,24 @@ def _q(slot: str, facts: IntakeFacts) -> str:
         "name": "Thank you. What is your full name, as it appears on your Social Security card?",
         "ssn": f"Thanks, {first}. What Social Security number should go on the return? (This is a demonstration, so only test numbers that start with 900 to 999 are accepted. Please don't type a real one.)",
         "dob": "What is your date of birth?",
-        "blind": "Are you legally blind? The IRS asks because it changes the standard deduction, which is the fixed amount of income that is not taxed. A simple yes or no is fine.",
+        "blind": "Are you legally blind? The IRS asks because it changes your standard deduction. A simple yes or no is fine.",
         "marital": "At the end of 2025, were you single, married, widowed, or divorced?",
         "spouse_died_in_year": "I'm sorry for your loss. Did your spouse pass away during 2025?",
         "filing_status": "Which filing status do you expect to use? The choices are single, married filing jointly, married filing separately, head of household, or qualifying surviving spouse. If you're not sure, just say so and I'll note it for the preparer.",
         "spouse_name": "What is your spouse's full name?",
+        # Guardrails B, no unnecessary PII: asked only when the spouse goes on the return (next_slot)
+        "spouse_ssn": f"The return also needs {sp.get('first_name') or 'your spouse'}'s Social Security number. What is it? (Test numbers starting 900 to 999 only, please. Don't type a real one.)",
         "spouse_dob": f"What is {sp.get('first_name') or 'your spouse'}'s date of birth?",
         "spouse_blind": f"Is {sp.get('first_name') or 'your spouse'} legally blind?",
-        "dependents": "Will you list any dependents on this return? A dependent is a child or relative you support. Say none, or tell me the first one's name and how they are related to you.",
+        # one question each: "who is it" (name and relationship together, as people say it), never "will you, and if so who"
+        "dependents": "Who is the first dependent you'll list on this return? For example 'Tom, my grandson'. If there isn't one, just say none.",
         "dependent_ssn": f"What is the Social Security number for {(facts.get('dependents') or [{}])[-1].get('name', 'that dependent')}? (Test numbers starting 900 to 999 only.)",
-        "more_dependents": "Is there another dependent to list? Say no, or give me their name and relationship.",
+        "more_dependents": "Who is the next dependent to list? If that's everyone, just say no more.",
         "can_be_claimed": "Can someone else claim you as a dependent on their own tax return? Most retirees answer no.",
         "documents_declared": "Which tax forms did you receive for 2025? For example a W-2 from an employer, an SSA-1099 for Social Security, a 1099-R for a pension or IRA, a 1099-INT for bank interest, or a 1099-DIV for dividends. Just list what you have.",
         "other_income": "Did you have any other income in 2025 that isn't on one of those forms? For example from a business or freelance work, renting out property, selling investments or cryptocurrency, or from outside the United States. Say no, or describe it briefly.",
-        "estimated_payments": "Did you send the IRS any estimated tax payments during 2025? Those are payments some people make every three months. If so, roughly how much in total? Otherwise say none.",
-        "schedule1_adjustments": "Do you have any adjustments to income to report? Those are a short list of items, such as a deductible IRA contribution or student loan interest, that reduce your income before tax. Give a total, or say none.",
+        "estimated_payments": "In total, how much did you send the IRS in estimated tax payments during 2025? Many people sent none, and 'none' is a fine answer.",
+        "schedule1_adjustments": "What is the total of any adjustments to income you have to report? If you have none, just say none.",
         "schedule1_other_income": "Did a preparer give you an amount for 'additional income' on Schedule 1? If you don't know what that is, say none.",
         "schedule2_line3": "Did a preparer give you an amount for additional taxes on Schedule 2? If not, say none.",
         "schedule3_line8": "Did a preparer give you an amount for credits on Schedule 3? If not, say none.",
@@ -129,6 +183,8 @@ def next_slot(facts: IntakeFacts) -> str | None:
         sp = facts.get("spouse") or {}
         if not sp.get("last_name"):
             return "spouse_name"
+        if not sp.get("ssn"):  # the form prints the spouse's SSN for joint and separate returns alike
+            return "spouse_ssn"
         if facts.get("filing_status") == "mfj" or facts.get("spouse_died_in_year"):
             if not sp.get("dob"):
                 return "spouse_dob"
@@ -204,26 +260,36 @@ def parse_doc_kinds(s: str) -> list[str]:
     return [k for k, needles in DOC_KINDS.items() if any(n in low for n in needles)]
 
 
+NO_MORE_RE = re.compile(r"\b(none|no one|nobody|no more|no other|nobody else|that's (?:all|everyone|it)|that is (?:all|everyone|it)|(?:don't|do not) have (?:any|one))\b", re.I)
+
+
+def answering_party_from(text: str) -> dict[str, Any]:
+    """Who is answering, from the reply to "am I speaking with the person whose return this is?".
+
+    A third party when someone says they are acting for the taxpayer, when the answer is no,
+    or when another person is mentioned without a clear yes ("my son is helping" after "yes"
+    is the taxpayer answering, with family nearby). A stated power of attorney or similar is
+    recorded as authority; the preparer still checks it.
+    """
+    yn = parse_yes_no(text)
+    if THIRD_PARTY_RE.search(text) or yn is False or (MENTIONS_OTHER_RE.search(text) and yn is not True):
+        auth = bool(AUTHORITY_RE.search(text))
+        return {"answering_party": "third_party_with_authority" if auth else "third_party_no_authority", "third_party_authority": text}
+    return {"answering_party": "self"}
+
+
 def scripted_parse(slot: str, text: str, facts: IntakeFacts) -> dict[str, Any]:
     """Offline parser: returns {"updates": {...}, "intent": ...}."""
     t = text.strip()
     up: dict[str, Any] = {}
     intent = "answer"
     if slot == "answering_party":
-        if THIRD_PARTY_RE.search(t) or re.search(r"\b(daughter|son|nephew|niece|caregiver|power of attorney|poa)\b", t, re.I):
-            auth = bool(re.search(r"\b(power of attorney|poa|authori[sz]ed|permission|form 2848|guardian|conservator)\b", t, re.I))
-            up["answering_party"] = "third_party_with_authority" if auth else "third_party_no_authority"
-            up["third_party_authority"] = t
-        elif parse_yes_no(t) is not False:
-            up["answering_party"] = "self"
-        else:
-            up["answering_party"] = "third_party_no_authority"
-            up["third_party_authority"] = t
+        up.update(answering_party_from(t))
     elif slot in ("name", "spouse_name"):
         words = [w for w in re.sub(r"[^A-Za-z' -]", " ", t).split() if w.lower() not in ("my", "name", "is", "it's", "its", "i'm", "im", "the", "spouse", "wife", "husband", "her", "his", "named", "called")]
         if words:
             up["first_name"], up["last_name"] = words[0].title(), words[-1].title() if len(words) > 1 else ""
-    elif slot in ("ssn", "dependent_ssn"):
+    elif slot in SSN_SLOTS:
         ok, ssn = valid_test_ssn(t)
         up["_ssn_ok"], up["_ssn"] = ok, ssn
     elif slot in ("dob", "spouse_dob"):
@@ -237,7 +303,7 @@ def scripted_parse(slot: str, text: str, facts: IntakeFacts) -> dict[str, Any]:
         low = t.lower()
         up["filing_status"] = next((k for k, ws in FILING_WORDS.items() if any(w in low for w in ws)), None)
     elif slot in ("dependents", "more_dependents"):
-        if parse_yes_no(t) is False or re.search(r"\b(none|no one|nobody)\b", t, re.I):
+        if parse_yes_no(t) is False or NO_MORE_RE.search(t):
             up["none"] = True
         else:
             m = re.match(r"\s*([A-Za-z' .-]+?)(?:,| is| -|\s+my\s+|\s*\()\s*(.*)$", t)
@@ -302,7 +368,7 @@ Return JSON only."""
 
 FREE_TEXT_SLOTS = ("answering_party", "other_income", "refund_account")
 MAX_ANSWER_CHARS = 1000  # longer answers are cut (and the cut noted); bounds tokens and abuse
-SSN_SLOTS = ("ssn", "dependent_ssn")
+SSN_SLOTS = ("ssn", "spouse_ssn", "dependent_ssn")
 INTENTS = {"answer", "advice_question", "go_back", "unsure", "third_party", "other"}
 MONEY_SLOTS = ("estimated_payments", "schedule1_adjustments", "schedule1_other_income", "schedule2_line3", "schedule3_line8")
 YES_NO_SLOTS = ("blind", "spouse_blind", "can_be_claimed", "refund_account_is_own", "spouse_died_in_year")
@@ -413,6 +479,9 @@ def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str
         f["third_party_authority"] = up.get("third_party_authority")
         if f["answering_party"] == "third_party_no_authority":
             reply.append("Thank you for telling me. Because you're answering for someone else, a Kushim employee will need to confirm you're authorised before we go further. I'll pause here and let them know.")
+        elif f["answering_party"] == "third_party_with_authority":
+            f.setdefault("noted_questions", []).append(f"Someone is answering for the taxpayer and stated an authority: {f['third_party_authority']!r}. Please see the paperwork.")
+            reply.append("Thank you. I've noted that you're helping with their authority, and the preparer will ask to see that paperwork. Please answer for them as best you can.")
     elif slot == "name":
         if up.get("last_name") or up.get("first_name"):
             tp["first_name"], tp["last_name"] = up.get("first_name", ""), up.get("last_name", "")
@@ -421,7 +490,7 @@ def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str
     elif slot == "spouse_name":
         if up.get("last_name") or up.get("first_name"):
             f["spouse"] = {**sp, "first_name": up.get("first_name", ""), "last_name": up.get("last_name", "")}
-    elif slot in ("ssn", "dependent_ssn"):
+    elif slot in SSN_SLOTS:
         if up.get("_ssn") is None:
             reply.append("I didn't see a number in the format 9xx-xx-xxxx.")
         elif not up.get("_ssn_ok"):
@@ -429,6 +498,8 @@ def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str
             f.setdefault("volunteered_ssn_events", []).append(f"{now_iso()}: a non-test SSN was entered at slot {slot}; rejected and not stored")
         elif slot == "ssn":
             tp["ssn"] = up["_ssn"]
+        elif slot == "spouse_ssn":
+            f["spouse"] = {**sp, "ssn": up["_ssn"]}
         else:
             f["dependents"][-1]["ssn"] = up["_ssn"]
     elif slot == "dob":
@@ -556,7 +627,10 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
     prefix = ""
     if last and gap_min > 30 and slot not in ("answering_party",):
         prefix = "Welcome back. Here's where we were: " + summarize_facts(facts) + " Let's continue. "
-    question = prefix + _q(slot, facts)
+    body, glossed = add_glosses(_q(slot, facts), facts)
+    question = prefix + body
+    if glossed:  # explained once per session; recorded with this turn's facts
+        facts["_glossed"] = [*(facts.get("_glossed") or []), *glossed]
 
     # ---- ask (checkpoint) and receive -------------------------------------
     answer = interrupt({"type": "upload" if slot == "upload" else "question", "slot": slot, "text": question, "summary": summarize_facts(facts), "return_id": state.get("return_id")})
@@ -578,7 +652,7 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
 
     # ---- deliberate handling of things that are not answers --------------
     said = text  # what the transcript records; `text` is what gets parsed
-    if slot not in ("ssn", "dependent_ssn"):
+    if slot not in SSN_SLOTS:
         ok, ssn = valid_test_ssn(text)
         if ssn:
             facts.setdefault("volunteered_ssn_events", []).append(f"{now_iso()}: an SSN was volunteered at slot {slot}; {'test series' if ok else 'NOT a test number'}; not stored")
@@ -594,10 +668,17 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
         # keep the answers we already have; ask the same question again next turn
         return _finish(state, facts, slot, question, said, reply, turns, escalations, events, tokens_in, tokens_out, repeat=True)
     if THIRD_PARTY_RE.search(text) and facts.get("answering_party") == "self" and slot != "answering_party":
-        facts["answering_party"] = "third_party_no_authority"
         facts["third_party_authority"] = text
-        reply.append("It sounds like someone else is answering now. A Kushim employee will need to confirm that's authorised, so I'll pause here.")
-        events.append("intake: third party detected mid-conversation")
+        if AUTHORITY_RE.search(text):
+            # someone else has taken over but says they are authorised: noted for the preparer to check, not a pause
+            facts["answering_party"] = "third_party_with_authority"
+            facts.setdefault("noted_questions", []).append(f"Someone else began answering mid-conversation and stated an authority: {text.strip()[:200]!r}. Please see the paperwork.")
+            reply.append("Thank you for letting me know. I've noted that you're helping with their authority, and the preparer will ask to see that paperwork.")
+            events.append("intake: third party with stated authority detected mid-conversation; noted for the preparer")
+        else:
+            facts["answering_party"] = "third_party_no_authority"
+            reply.append("It sounds like someone else is answering now. A Kushim employee will need to confirm that's authorised, so I'll pause here.")
+            events.append("intake: third party detected mid-conversation")
     if GO_BACK_RE.search(text) and slot not in ("confirm", "answering_party", "name") and not re.search(r"\d", text) and guess_slot(text) and guess_slot(text) != slot:
         target = guess_slot(text)
         _clear_slot(facts, target)
@@ -616,10 +697,10 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
     else:
         parsed = scripted_parse(slot, text, facts)
     parsed["_text"] = text
-    if slot == "answering_party" and (THIRD_PARTY_RE.search(text) or re.search(r"\b(daughter|son|nephew|niece|caregiver)\b", text, re.I)):
+    if slot == "answering_party":
         # whichever parser read it, a stated third party is never taken as "self"
-        cautious = scripted_parse(slot, text, facts)["updates"]
-        if (parsed.get("updates") or {}).get("answering_party") in (None, "self"):
+        cautious = answering_party_from(text)
+        if cautious["answering_party"] != "self" and (parsed.get("updates") or {}).get("answering_party") in (None, "self"):
             parsed.setdefault("updates", {}).update(cautious)
     if UNSURE_RE.search(text) and parsed.get("intent") == "answer":
         parsed["intent"] = "unsure"
