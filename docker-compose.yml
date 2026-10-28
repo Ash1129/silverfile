@@ -1,8 +1,10 @@
+# Local run of the hardened image. Needs SILVERFILE_DATA_KEY (and, for the first login,
+# SILVERFILE_ADMIN_USER / SILVERFILE_ADMIN_PASSWORD) in .env; without the key it refuses to start.
 services:
   silverfile:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # loopback only; put a TLS proxy in front for anything shared
     env_file:
       - path: .env
         required: false
@@ -10,5 +12,14 @@ services:
       SILVERFILE_DATA_DIR: /data
     volumes:
       - silverfile-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - "no-new-privileges:true"
+    pids_limit: 256
+    mem_limit: 1g
+    restart: unless-stopped
 volumes:
   silverfile-data:

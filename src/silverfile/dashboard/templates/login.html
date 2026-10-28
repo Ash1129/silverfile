@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Staff log in{% endblock %}
+{% block content %}
+<section class="card gate">
+  <h1>Kushim staff log in</h1>
+  <p>The dashboard shows taxpayers' draft returns, so every page needs a staff account. What you can see depends on your role.</p>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/login" class="gate-form" autocomplete="on">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="username">Username</label>
+    <input id="username" name="username" type="text" required autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="40">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" maxlength="200">
+    <button class="button primary" type="submit">Log in</button>
+  </form>
+  {% if no_staff %}<p class="muted small">No staff account exists yet. On the server, run <code>python run.py staff add &lt;name&gt; --role admin</code>, or set <code>SILVERFILE_ADMIN_USER</code> and <code>SILVERFILE_ADMIN_PASSWORD</code> and restart.</p>{% endif %}
+  <p class="muted small">Are you a taxpayer? <a href="/start">Start or continue your return here</a>. You never need a staff account or a Social Security number to sign in.</p>
+</section>
+{% endblock %}

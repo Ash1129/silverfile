@@ -12,7 +12,7 @@
       <tbody>
       {% for r in rows %}
         <tr class="{% if r.waiting_on_human %}needs-person{% endif %}">
-          <td><a href="/returns/{{ r.return_id }}"><code>{{ r.return_id }}</code></a>{% if r.fixture %}<br><span class="muted small">from {{ r.fixture }}</span>{% endif %}</td>
+          <td>{% if can("view_return") %}<a href="/returns/{{ r.return_id }}"><code>{{ r.return_id[:12] }}</code></a>{% else %}<code>{{ r.return_id[:12] }}</code>{% endif %}{% if r.fixture %}<br><span class="muted small">from {{ r.fixture }}</span>{% endif %}</td>
           <td>{{ r.taxpayer_name or "—" }}{% if r.summary %}<div class="muted small clamp">{{ r.summary }}</div>{% endif %}</td>
           <td class="nowrap">
             {% if r.waiting_on_human %}<span class="badge alert big">Needs a person</span>
@@ -29,7 +29,9 @@
 
   <section class="card">
     <h2>Start a return</h2>
+    {% if can("create_return") %}
     <form method="post" action="/returns/new" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
       <label>Start from a fixture
         <select name="fixture">
           <option value="">— none: blank conversation —</option>
@@ -37,12 +39,13 @@
         </select>
       </label>
       <label class="check"><input type="checkbox" name="prefilled" value="1"> Skip the conversation (prefilled intake.json). Otherwise the conversation starts and the fixture's documents are attached at the upload step automatically.</label>
-      <label>Upload documents (W-2 / 1099 images, or .json payloads; optional)
-        <input type="file" name="files" multiple accept=".jpg,.jpeg,.png,.webp,.json">
+      <label>Upload documents (JPEG or PNG photos, or PDFs; optional)
+        <input type="file" name="files" multiple accept="{{ accept }}">
       </label>
       <button type="submit" class="button primary">Start return</button>
-      <p class="muted small">The file name tells SilverFile what the document is (w2, ssa, 1099r, 1099int, 1099div); anything else is "unknown" and goes to a person.</p>
+      <p class="muted small">The file name tells SilverFile what the document is (w2, ssa, 1099r, 1099int, 1099div); anything else is "unknown" and goes to a person. A conversation return gives you an access code to hand to the taxpayer.</p>
     </form>
+    {% endif %}
   </section>
 </div>
 {% endblock %}

@@ -15,7 +15,9 @@ from typing import Any
 
 from ..provenance import now_iso
 from ..state import Escalation, EligibilityResult, ReturnState
-from ..tax_math import rules as tm
+from ..security.capabilities import tools_for
+
+tm = tools_for("eligibility")  # only is_1040sr_eligible, count_12d_boxes and FILING_STATUSES
 
 OUT_OF_SCOPE_KINDS = {
     "1099-NEC": "self-employment / nonemployee compensation (Schedule C)",

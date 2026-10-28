@@ -2,11 +2,25 @@
 .venv.nosync
 __pycache__/
 *.pyc
-.env
-*.sqlite
-*.sqlite-journal
-data/runtime/
-traces/*.jsonl
-outputs/
 .pytest_cache/
 .DS_Store
+outputs/
+traces/*.jsonl
+
+# Secrets: never commit a key. .env.example is the only env file in git.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+.data_key
+secrets/
+
+# Runtime data: checkpoints, uploads, the index, accounts and the security log (all PII or credentials)
+data/runtime/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db

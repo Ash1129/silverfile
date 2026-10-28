@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Your tax questions{% endblock %}
+{% block site %}SilverFile{% endblock %}
+{% block head %}{% if auto_refresh %}<script nonce="{{ csp_nonce }}">setTimeout(function () { location.reload(); }, 2000);</script>{% endif %}{% endblock %}
+{% block brand %}<span class="brand">SilverFile <span>for Kushim taxpayers</span></span>{% endblock %}
+{% block nav %}
+<form method="post" action="/t/leave" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="linkish" type="submit">Save and leave</button></form>
+{% endblock %}
+{% block content %}
+<section class="card chat taxpayer-chat">
+  <h1>Your return</h1>
+  <div class="transcript">
+    {% if not transcript and not pending %}<p class="muted">Getting things ready…</p>{% endif %}
+    {% for m in transcript %}
+    <div class="msg {{ m.role }}"><span class="who">{{ "SilverFile" if m.role == "assistant" else "You" }}</span><p>{{ m.text }}</p></div>
+    {% endfor %}
+    {% if pending %}
+    <div class="msg assistant pending"><span class="who">SilverFile asks</span><p>{{ pending.text | mask }}</p></div>
+    {% endif %}
+  </div>
+
+  {% if pending and pending.type == "question" %}
+  <form method="post" action="/t/answer" class="stack answer" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <input type="hidden" name="interrupt_id" value="{{ pending_id }}">
+    <label>Your answer
+      <input type="text" name="text" autofocus autocomplete="off" required maxlength="1000">
+    </label>
+    <button type="submit" class="button primary">Send</button>
+  </form>
+  {% elif pending and pending.type == "upload" %}
+  <form method="post" action="/t/upload" enctype="multipart/form-data" class="stack answer">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
+    <input type="hidden" name="interrupt_id" value="{{ pending_id }}">
+    <label>Photos (JPEG or PNG) or PDFs of your tax forms, up to {{ max_mb }} MB each
+      <input type="file" name="files" multiple accept="{{ accept }}">
+    </label>
+    <input type="hidden" name="text" value="done">
+    <div class="row">
+      <button type="submit" class="button primary">Upload and continue</button>
+      {% if has_fixture %}<button type="submit" class="button" name="use_fixture" value="1">Use the demonstration documents and continue</button>{% endif %}
+    </div>
+    <p class="muted small">Photo location and camera details are removed from images when they arrive. Files are stored encrypted.</p>
+  </form>
+  {% elif waiting_on_kushim %}
+  <p class="done">Thank you. A Kushim preparer needs to look at something before we go on. Your answers are saved; you can close this page, and Kushim will be in touch.</p>
+  {% elif state.status == "complete" or state.status == "halted" %}
+  <p class="done">Thank you. Your answers and documents are with a Kushim preparer, who will contact you about the next step.</p>
+  {% endif %}
+</section>
+{% endblock %}

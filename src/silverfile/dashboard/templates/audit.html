@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Security log{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Security log <span class="count">{{ n }} events</span></h1>
+  {% if intact %}<p class="seal ok">Hash chain intact: every event since the first is unaltered, in order, none removed.</p>
+  {% else %}<p class="seal bad">Hash chain BROKEN at event {{ bad }}: an event was edited, removed or reordered from there on.</p>{% endif %}
+  <p class="muted small">Each event's HMAC covers the previous event's, keyed with the server's data key. SSNs and API keys are redacted before an event is written.</p>
+  <table class="list">
+    <thead><tr><th class="num">#</th><th>When</th><th>Event</th><th>Actor</th><th>Return</th><th>Detail</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr><td class="num">{{ e.seq }}</td><td class="nowrap">{{ e.at | when }}</td><td><code>{{ e.kind }}</code></td><td>{{ e.actor or "—" }}</td>
+        <td>{% if e.return_id %}<a href="/returns/{{ e.return_id }}"><code>{{ e.return_id[:12] }}</code></a>{% else %}—{% endif %}</td>
+        <td><code class="small">{{ e.detail | tojson }}</code></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

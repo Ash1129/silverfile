@@ -19,6 +19,9 @@ from typing import Any
 
 from . import service
 from .config import ROOT
+from .security import auth
+
+SEEDER = auth.system("demo-seed")  # the seed acts as the system, through the same checks as a person
 
 # Each entry: which fixture's documents, which intake (None = hold the conversation),
 # an optional name/field patch, scripted answers, and how a person resolves each
@@ -77,8 +80,8 @@ def seed_one(spec: dict[str, Any]) -> str:
     intake = _intake(spec.get("intake"), spec.get("intake_patch"))
     answers = service.fixture_answers(fixture)[: spec.get("answers", 0)] if intake is None else []
     resolution = spec.get("resolution") or {}
-    rid = service.create_return([] if intake is None else docs, intake, return_id="demo-" + service.new_return_id()[4:], fixture=fixture)
-    service.run(rid)
+    rid = service.create_return([] if intake is None else docs, intake, return_id="demo-" + service.new_return_id()[4:], fixture=fixture, actor=SEEDER)
+    service.run(rid, actor=SEEDER)
     for _ in range(MAX_STEPS):
         p = service.pending(rid)
         if not p:
@@ -88,12 +91,12 @@ def seed_one(spec: dict[str, Any]) -> str:
             res = resolution.get(p["escalation"]["kind"])
             if res is None:
                 break
-            service.resolve(rid, {"resolved_by": "demo-seed", **res})
+            service.resolve(rid, {"resolved_by": "demo-seed", **res}, actor=SEEDER)
         elif kind in ("question", "upload"):
             if not answers:
                 break
             text = answers.pop(0)
-            service.answer(rid, text, docs if kind == "upload" else None)
+            service.answer(rid, text, docs if kind == "upload" else None, actor=SEEDER)
         else:
             break
     return rid

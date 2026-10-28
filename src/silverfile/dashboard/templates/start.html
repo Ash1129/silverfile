@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Your tax questions{% endblock %}
+{% block site %}SilverFile{% endblock %}
+{% block brand %}<span class="brand">SilverFile <span>for Kushim taxpayers</span></span>{% endblock %}
+{% block nav %}<a href="/login">Kushim staff</a>{% endblock %}
+{% block content %}
+<div class="two-col">
+  <section class="card">
+    <h1>Start your return</h1>
+    <p>SilverFile asks you a few plain questions, one at a time, and collects photos of your tax forms. A Kushim preparer then checks everything. Nothing is filed and no advice is given.</p>
+    <p>When you start, you get an <strong>access code</strong>. Write it down: it is the only way back to your answers. Nobody can open your return with your name or your Social Security number.</p>
+    <form method="post" action="/start">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <button class="button primary" type="submit">Start a new return</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Continue a return</h2>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="/resume" class="stack" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label>Your access code
+        <input type="text" name="code" required placeholder="ABCD-EFGH-…" autocapitalize="characters" spellcheck="false" maxlength="40">
+      </label>
+      <button class="button" type="submit">Continue</button>
+    </form>
+    <p class="muted small">Lost your code? Call Kushim; a staff member can give you a new one (the old one then stops working).</p>
+  </section>
+</div>
+{% endblock %}

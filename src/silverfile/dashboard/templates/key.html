@@ -6,6 +6,7 @@
   <p>This shared copy runs the live models: Claude reads the taxpayer's answers, the document images and the draft for review. It has no key of its own. Paste yours and the dashboard uses it for your runs only.</p>
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   <form method="post" action="/key" class="gate-form" autocomplete="off">
+    <input type="hidden" name="csrf_token" value="{{ csrf }}">
     <label for="api_key">Anthropic API key</label>
     <input id="api_key" name="api_key" type="password" required placeholder="sk-ant-…" spellcheck="false" autocapitalize="off">
     <button class="button primary" type="submit">Continue</button>

@@ -94,3 +94,14 @@ ul.plain { padding-left: 1.2rem; margin: .25rem 0; }
 .error { color: #8a1c1c; font-weight: 600; }
 .top nav form { display: inline; margin-left: 1rem; }
 .top nav .linkish { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+/* security additions */
+form.inline { display: inline; margin: 0; }
+.who-am-i { color: #c9d1d9; margin-left: 1rem; font-size: .9rem; }
+header.top nav form.inline button.linkish { margin-left: 1rem; }
+.access-code { font-size: 1.5rem; letter-spacing: .08em; margin: 1rem 0; }
+.access-code code { background: var(--tint); padding: .4rem .8rem; border-radius: 4px; border: 1px solid var(--rule); }
+.seal { padding: .5rem .8rem; border-radius: 4px; font-weight: 600; }
+.seal.ok { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+.seal.bad { background: var(--red-bg); color: var(--red); border: 1px solid var(--red); }
+.button.danger { background: var(--red); color: #fff; border-color: var(--red); }
+.taxpayer-chat { max-width: 46rem; margin: 0 auto; }

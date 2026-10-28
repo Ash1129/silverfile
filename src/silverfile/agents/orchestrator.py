@@ -12,6 +12,7 @@ from typing import Any
 from langgraph.types import Send
 
 from ..provenance import now_iso
+from ..security.validate import faults_allowed
 from ..state import LOOP_PATTERN_REPEATS, MAX_HANDOFFS, MAX_REVIEW_ROUNDS, Escalation, ReturnState
 
 GUARDED = ("extraction", "eligibility", "computation", "review", "escalation")  # intake turns are legitimate repetition
@@ -49,7 +50,7 @@ def decide_next(state: ReturnState) -> str:
     """The orchestrator's decision, as a label. `route` turns it into edges."""
     if state.get("status") in ("complete", "halted"):
         return "end"
-    fault = state.get("fault_injection") or {}
+    fault = (state.get("fault_injection") or {}) if faults_allowed() else {}
     if fault.get("ping_pong") and state.get("intake_complete") and not state.get("loop_guard_tripped"):
         # test hook: a pathological handoff cycle between two agents
         last = [h for h in state.get("handoffs", []) if h in ("eligibility", "computation")]

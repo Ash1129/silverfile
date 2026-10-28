@@ -32,6 +32,7 @@ class TaxMathClient:
 
     direct: bool | None = None
     calls: list[ToolCall] = field(default_factory=list)
+    agent: str = "computation"  # whose tool allowance applies (security/capabilities.py)
 
     def __post_init__(self) -> None:
         if self.direct is None:
@@ -60,8 +61,11 @@ class TaxMathClient:
 
     # -- calls -----------------------------------------------------------
     def call(self, tool: str, **arguments: Any) -> Any:
+        from ..security.capabilities import check
+
         if tool not in rules.TOOL_FUNCTIONS:
             raise KeyError(f"unknown tax_math tool {tool}")
+        check(self.agent, tool)  # least privilege: raises before anything goes over the wire
         if self.direct or self._session is None:
             result = rules.TOOL_FUNCTIONS[tool](**arguments)
             transport = "direct"
@@ -74,7 +78,9 @@ class TaxMathClient:
 
     def list_tools(self) -> list[str]:
         if self.direct or self._session is None:
-            return sorted(rules.TOOL_FUNCTIONS)
+            from ..security.capabilities import AGENT_TOOLS
+
+            return sorted(AGENT_TOOLS.get(self.agent, frozenset()))
         fut = asyncio.run_coroutine_threadsafe(self._alist(), self._loop)
         return fut.result(timeout=30)
 
@@ -95,7 +101,10 @@ class TaxMathClient:
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
-        params = StdioServerParameters(command=sys.executable, args=["-m", "silverfile.tax_math.server"], env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)})
+        from ..security.capabilities import AGENT_TOOLS
+
+        tools = ",".join(sorted(AGENT_TOOLS.get(self.agent, frozenset()))) or "-"
+        params = StdioServerParameters(command=sys.executable, args=["-m", "silverfile.tax_math.server"], env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path), "SILVERFILE_TAXMATH_TOOLS": tools})
         self._stdio_cm = stdio_client(params)
         read, write = await self._stdio_cm.__aenter__()
         self._session_cm = ClientSession(read, write)
