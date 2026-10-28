@@ -74,6 +74,16 @@ Why a hub and not a pipeline: the brief's control flow is full of "if this, go b
 
 `detect_loop` in `agents/orchestrator.py` has two detectors: an absolute ceiling (`MAX_HANDOFFS = 40` handoffs among the working agents) and a repeated short pattern (a 2- or 3-agent cycle repeated `LOOP_PATTERN_REPEATS = 3` times without reaching review). When it fires the Orchestrator writes a `loop_guard` escalation, the return pauses for a person, and whatever the person decides, the handoff log is marked `reset` so the guard judges only what happens afterwards. `tests/test_loop_guard.py` turns on a fault-injection flag that makes Eligibility and Computation hand the return back and forth, and asserts the guard trips, the reason names the pattern, and the return reaches a person rather than spinning.
 
+## Inter-agent communication
+
+Agents talk through a typed **message bus** (`mailbox` in graph state, `src/silverfile/comms/`) rather than loose state fields. Every handoff is a `request` from the Orchestrator, and every result is an `inform` reply on the same thread. Review's findings become `revise` **work orders** addressed to the agent that owns each fix, and that agent replies `done`. Escalations appear as `escalate`, and a person's decision as `resolve`. Three things hold this together:
+
+- **Channel policy** (`protocol.CHANNELS`): who may send which speech act to whom. Only the Orchestrator hands off, only Intake reaches the taxpayer, only Review issues work orders, and only a person resolves. Anything else is refused at construction.
+- **Write contracts** (`contracts.WRITES`): the state keys each agent may write, enforced on every node by the hub. Review physically cannot write `lines`. An illegal write is dropped and logged as a `violation`.
+- **An order-independent reducer** (`merge_messages`): content-addressed ids and a logical clock, so the parallel extraction branches post at once and the log is identical whichever branch finishes first. Redelivery is a no-op.
+
+Open work orders also steer routing. If Review finds problems for both Extraction and Computation, each runs before review comes round again. The **Agent messages** card on each return in the dashboard shows the log (`/returns/<id>/messages.json` for the raw envelopes). Full design, sequence diagram and tests: [docs/INTER_AGENT_COMMUNICATION.md](docs/INTER_AGENT_COMMUNICATION.md).
+
 ## Escalation conditions
 
 Every one of these produces an `Escalation` record with a reason and a rulebook citation, pauses the thread, and shows up in the dashboard queue:
@@ -114,6 +124,7 @@ The Intake agent is the only one that speaks to the taxpayer, and the choices th
 src/silverfile/
   graph.py            StateGraph, checkpointer, finalize
   state.py            ReturnState, reducers, limits
+  comms/              inter-agent message protocol, channel policy, write contracts, bus wrapper
   agents/             orchestrator, intake, extraction, eligibility, computation, review, escalation
   tax_math/           rules.py (pure functions), server.py (MCP), client.py (stdio client + call log)
   provenance.py       the per-line record

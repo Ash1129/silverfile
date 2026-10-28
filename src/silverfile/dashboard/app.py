@@ -30,7 +30,8 @@ from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import UploadFile  # what request.form() returns (FastAPI's UploadFile is a subclass, so isinstance against it never matched)
 
 from .. import seed, service
-from ..forms.render import jinja_env, render_html, render_pdf, status_label
+from ..comms.bus import digest
+from ..forms.render import jinja_env, mask_ssn_deep, render_html, render_pdf, status_label
 from ..memory import session_summary
 from ..security import audit, auth, integrity, ratelimit, retention, uploads
 from ..security.pii import install_log_redaction
@@ -244,7 +245,7 @@ def create_app() -> FastAPI:
             escalation=(pend.get("escalation") if pend and pend.get("type") == "escalation" else (open_esc[0] if open_esc else None)),
             documents_in=state.get("documents_in") or [], filing_statuses=FILING_STATUSES,
             auto_refresh=state.get("status") in BUSY_STATUSES, busy=BUSY_STATUSES, status_text=status_label(state.get("status")),
-            hop_chain=_compress_hops(state.get("handoffs") or []), seal=integrity.verify(state),
+            hop_chain=_compress_hops(state.get("handoffs") or []), seal=integrity.verify(state), bus=digest(state),
             security_events=audit.recent(20, return_id=rid) if me.can("view_audit") else [],
         )
 
@@ -319,6 +320,13 @@ def create_app() -> FastAPI:
         require_staff(request, "view_draft")
         check_return_id(rid)
         return JSONResponse(await run_in_threadpool(service.state_json, rid))
+
+    @app.get("/returns/{rid}/messages.json")
+    async def messages_json(request: Request, rid: str):
+        require_staff(request, "view_return")
+        check_return_id(rid)
+        state = await run_in_threadpool(service.get_state, rid)
+        return JSONResponse({"return_id": rid, "mailbox": mask_ssn_deep(state.get("mailbox") or [])})
 
     @app.get("/returns/{rid}/pending.json")
     async def pending_json(request: Request, rid: str):

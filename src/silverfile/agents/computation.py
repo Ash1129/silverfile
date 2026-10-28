@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ..comms.bus import latest_request
 from ..faults import apply_computation_faults
 from ..provenance import record, user_input
 from ..state import Provenance, ReturnState
@@ -42,7 +43,9 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
     version = int(state.get("computation_version", 0))  # assigned by the orchestrator
     lines: dict[str, float] = {}
     prov: dict[str, Provenance] = {}
-    notes: list[str] = []
+    # review findings arrive as work orders inside the orchestrator's request; record which ones this run answers
+    orders = ((latest_request(state, "computation") or {}).get("body") or {}).get("work_orders") or []
+    notes: list[str] = [f"re-run for review work order {o['finding_id']}: {o['detail']}" for o in orders]
 
     with TaxMathClient() as tm:
         def put(line: str, amount: float, **kw: Any) -> float:

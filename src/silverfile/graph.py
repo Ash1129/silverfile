@@ -33,6 +33,7 @@ from .agents.extraction import aggregate_extraction_node, extract_document_node
 from .agents.intake import run_intake
 from .agents.orchestrator import orchestrator_node, route
 from .agents.review import run_review
+from .comms import communicating, communicating_branch
 from .config import settings
 from .provenance import now_iso
 from .security import crypto, integrity
@@ -56,16 +57,17 @@ def finalize_node(state: ReturnState) -> dict[str, Any]:
 
 
 def build_graph():
+    # every spoke is wrapped so it speaks the message protocol and is held to its write contract (comms/)
     g = StateGraph(ReturnState)
     g.add_node("orchestrator", orchestrator_node)
-    g.add_node("intake", run_intake)
-    g.add_node("extract_document", extract_document_node)
-    g.add_node("aggregate_extraction", aggregate_extraction_node)
-    g.add_node("eligibility", run_eligibility)
-    g.add_node("computation", run_computation)
-    g.add_node("review", run_review)
-    g.add_node("escalation", escalation_node)
-    g.add_node("finalize", finalize_node)
+    g.add_node("intake", communicating("intake", run_intake))
+    g.add_node("extract_document", communicating_branch(extract_document_node))
+    g.add_node("aggregate_extraction", communicating("extraction", aggregate_extraction_node))
+    g.add_node("eligibility", communicating("eligibility", run_eligibility))
+    g.add_node("computation", communicating("computation", run_computation))
+    g.add_node("review", communicating("review", run_review))
+    g.add_node("escalation", communicating("escalation", escalation_node))
+    g.add_node("finalize", communicating("finalize", finalize_node))
 
     g.add_edge(START, "orchestrator")
     g.add_conditional_edges("orchestrator", route, ["intake", "extract_document", "aggregate_extraction", "eligibility", "computation", "review", "escalation", "finalize", "orchestrator"])
@@ -115,5 +117,5 @@ def new_return_state(return_id: str, documents: list[dict[str, Any]] | None = No
         "intake": intake or {}, "intake_complete": bool(intake and intake.get("_confirmed")),
         "documents_in": documents or [], "extraction_done": False, "lines": {}, "provenance": {}, "computation_version": 0,
         "review_round": 0, "review_passed": False, "revise_target": None, "loop_guard_tripped": False, "fault_injection": fault_injection or {},
-        "handoffs": [], "events": [f"return {return_id} created"],
+        "handoffs": [], "mailbox": [], "events": [f"return {return_id} created"],
     }
