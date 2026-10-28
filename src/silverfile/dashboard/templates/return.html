@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ rid }} — {{ row.taxpayer_name or "return" }}{% endblock %}
-{% block head %}{% if auto_refresh %}<script>setTimeout(function () { location.reload(); }, 2000);</script>{% endif %}{% endblock %}
+{% block head %}{% if auto_refresh %}<script nonce="{{ csp_nonce }}">setTimeout(function () { location.reload(); }, 2000);</script>{% endif %}{% endblock %}
 {% block content %}
 <section class="card head">
   <div>
@@ -11,10 +11,12 @@
     <span class="status status-{{ state.status }}">{{ status_text }}</span>
     {% if pending and pending.type in ("question", "upload") %}<span class="badge">Waiting on taxpayer</span>{% endif %}
     <div class="links">
+      {% if can("view_draft") %}
       <a class="button" href="/returns/{{ rid }}/form">Draft form</a>
       <a class="button" href="/returns/{{ rid }}/form.pdf">PDF</a>
       <a class="button" href="/returns/{{ rid }}/state.json">state.json</a>
-      {% if auto_refresh %}<form method="post" action="/returns/{{ rid }}/run" style="display:inline"><button class="button" type="submit">Advance</button></form>{% endif %}
+      {% endif %}
+      {% if auto_refresh and can("advance_return") %}<form method="post" action="/returns/{{ rid }}/run" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="button" type="submit">Advance</button></form>{% endif %}
     </div>
     <div class="muted small">created {{ state.created_at | when }} · updated {{ row.updated_at | when }}{% if fixture %} · from {{ fixture }}{% endif %}</div>
   </div>
@@ -34,29 +36,15 @@
       {% endif %}
     </div>
 
-    {% if pending and pending.type == "question" %}
-    <form method="post" action="/returns/{{ rid }}/answer" class="stack answer">
-      <label>Your answer <span class="muted small">(slot: {{ pending.slot }})</span>
-        <input type="text" name="text" autofocus autocomplete="off" required>
-      </label>
-      <button type="submit" class="button primary">Send</button>
-    </form>
-    {% elif pending and pending.type == "upload" %}
-    <form method="post" action="/returns/{{ rid }}/upload" enctype="multipart/form-data" class="stack answer">
-      {% if documents_in %}
-      <p class="small">Already attached to this return: {% for d in documents_in %}<span class="kind">{{ d.id }} · {{ d.kind }}</span> {% endfor %}</p>
-      {% endif %}
-      <label>Upload more documents (images or .json payloads)
-        <input type="file" name="files" multiple accept=".jpg,.jpeg,.png,.webp,.json">
-      </label>
-      <label>Message <input type="text" name="text" value="done" autocomplete="off"></label>
-      <div class="row">
-        <button type="submit" class="button primary">Upload and continue</button>
-        {% if fixture %}<button type="submit" class="button" name="use_fixture" value="1">Use attached fixture documents ({{ fixture }}) and continue</button>{% endif %}
-      </div>
-    </form>
+    {% if pending and pending.type in ("question", "upload") %}
+    <p class="muted">Waiting on the taxpayer. They answer in their own session, opened with their access code; staff cannot answer for them.
+      {% if documents_in %}<br><span class="small">Attached so far: {% for d in documents_in %}<span class="kind">{{ d.original_name or d.id }} · {{ d.kind }}</span> {% endfor %}</span>{% endif %}</p>
+    {% if can("create_return") %}
+    <form method="post" action="/returns/{{ rid }}/access-code" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="button" type="submit">Issue a new access code</button></form>
+    <span class="muted small">(for a taxpayer who lost theirs; the old code stops working)</span>
+    {% endif %}
     {% elif state.status == "complete" %}
-    <p class="done">Draft complete. <a href="/returns/{{ rid }}/form">Open the draft form</a> or the <a href="/returns/{{ rid }}/form.pdf">PDF</a>.</p>
+    <p class="done">Draft complete.{% if can("view_draft") %} <a href="/returns/{{ rid }}/form">Open the draft form</a> or the <a href="/returns/{{ rid }}/form.pdf">PDF</a>.{% endif %}</p>
     {% elif state.status == "halted" %}
     <p class="halt">Halted: {{ state.halted_reason or "a Kushim preparer takes it from here." }}</p>
     {% endif %}
@@ -71,8 +59,11 @@
       <p class="muted small">Raised by {{ escalation.raised_by }} at {{ escalation.raised_at | when }}{% if pending and pending.open_count and pending.open_count > 1 %} · {{ pending.open_count }} open in total{% endif %}</p>
       {% if escalation.details %}<details><summary>Details</summary><pre>{{ escalation.details | pretty | mask }}</pre></details>{% endif %}
       {% if pending and pending.type == "escalation" %}
+      {% if can("resolve_escalation") %}
       <form method="post" action="/returns/{{ rid }}/resolve" class="stack">
-        <label>Resolved by <input type="text" name="resolved_by" placeholder="your name" required></label>
+        <input type="hidden" name="csrf_token" value="{{ csrf }}">
+        <input type="hidden" name="interrupt_id" value="{{ pending_id }}">
+        <p class="small">Resolving as <strong>{{ me.subject }}</strong> ({{ me.role }}). Your name, role, decision and the time go on the return and in the security log.</p>
         <label>Note <textarea name="note" rows="2" placeholder="what was decided and why"></textarea></label>
         <fieldset>
           <legend>Action</legend>
@@ -88,8 +79,9 @@
         </label>
         <button type="submit" class="button primary">Resolve</button>
       </form>
+      {% else %}<p class="muted">Your role cannot resolve escalations; a preparer will.</p>{% endif %}
       {% else %}
-      <p class="muted">The graph has not reached this escalation yet. <form method="post" action="/returns/{{ rid }}/run" style="display:inline"><button class="button" type="submit">Advance</button></form></p>
+      <p class="muted">The graph has not reached this escalation yet.{% if can("advance_return") %} <form method="post" action="/returns/{{ rid }}/run" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="button" type="submit">Advance</button></form>{% endif %}</p>
       {% endif %}
     </section>
     {% endif %}
@@ -98,7 +90,7 @@
     {% if resolved %}
     <section class="card">
       <h2>Resolved escalations</h2>
-      <ul class="plain">{% for e in resolved %}<li><code>{{ e.kind }}</code> — {{ e.reason | mask }}<br><span class="muted small">{{ e.resolution.action }} by {{ e.resolved_by }} at {{ e.resolved_at | when }}{% if e.resolution.note %} — {{ e.resolution.note | mask }}{% endif %}{% if e.resolution.facts_patch %} · patch <code>{{ e.resolution.facts_patch | tojson }}</code>{% endif %}</span></li>{% endfor %}</ul>
+      <ul class="plain">{% for e in resolved %}<li><code>{{ e.kind }}</code> — {{ e.reason | mask }}<br><span class="muted small">{{ e.resolution.action }} by {{ e.resolved_by }}{% if e.resolution.resolved_by_role %} ({{ e.resolution.resolved_by_role }}){% endif %} at {{ e.resolved_at | when }}{% if e.resolution.note %} — {{ e.resolution.note | mask }}{% endif %}{% if e.resolution.facts_patch %} · patch <code>{{ e.resolution.facts_patch | tojson }}</code>{% endif %}</span></li>{% endfor %}</ul>
     </section>
     {% endif %}
 
@@ -119,7 +111,31 @@
       {% else %}<p class="muted">No model calls yet{% if not state.token_log %} (offline mode uses the scripted parser, fixture extraction and rules-only review){% endif %}.</p>{% endif %}
     </section>
 
-    {% if state.lines %}
+    {% if seal.sealed %}
+    <section class="card">
+      <h2>Provenance seal</h2>
+      {% if seal.ok %}<p class="seal ok">Verified: no amount or provenance record has changed since the draft was sealed after review round {{ seal.review_round }} ({{ seal.sealed_at | when }}).</p>
+      {% else %}<p class="seal bad">The draft no longer matches its seal{% if seal.altered %}: line {{ seal.altered | join(", ") }} changed{% endif %}{% if seal.added %}; lines added: {{ seal.added | join(", ") }}{% endif %}{% if seal.removed %}; lines removed: {{ seal.removed | join(", ") }}{% endif %}{% if not seal.signature_ok %}; the seal's signature does not verify{% endif %}. Do not rely on it.</p>{% endif %}
+      <p class="muted small">Root <code>{{ seal.root[:16] }}…</code>, a SHA-256 chain over every line and its provenance, signed with the server's key.</p>
+    </section>
+    {% endif %}
+
+    {% if security_events %}
+    <section class="card">
+      <h2>Security events for this return</h2>
+      <ul class="plain small">{% for e in security_events %}<li><code>{{ e.kind }}</code> · {{ e.actor or "—" }} · {{ e.at | when }}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+
+    {% if can("delete_return") %}
+    <section class="card">
+      <h2>Delete</h2>
+      <form method="post" action="/returns/{{ rid }}/delete" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="button danger" type="submit">Delete this return and its documents</button></form>
+      <p class="muted small">Removes the checkpoints, the encrypted uploads, the access code and the index row. The security log keeps a record that it happened.</p>
+    </section>
+    {% endif %}
+
+    {% if state.lines and can("view_draft") %}
     <section class="card">
       <h2>Key lines</h2>
       <table class="list">

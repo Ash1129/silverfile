@@ -8,11 +8,14 @@ A multi-agent preparation aid that turns a short conversation and a handful of u
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt && pip install -e .
+pip install -r requirements-dev.txt && pip install -e .
 python data/generate_fixtures.py          # synthetic documents and W-2 images
-cp .env.example .env                       # add ANTHROPIC_API_KEY to use Claude; blank = offline mode
-python run.py serve                        # dashboard + taxpayer chat at http://localhost:8000
+cp .env.example .env && chmod 600 .env     # add ANTHROPIC_API_KEY to use Claude; blank = offline mode
+python run.py staff add yourname --role admin   # the dashboard needs a staff login (password prompted)
+python run.py serve                        # staff dashboard at http://localhost:8000, taxpayers at /start
 ```
+
+Staff log in at `/`. A conversation return gives you an access code for the taxpayer; the taxpayer opens it at `/start` (or with the "open the taxpayer's view" button, in a separate session in the same browser). Staff cannot answer for the taxpayer. Set `SILVERFILE_DATA_KEY` in `.env` for anything beyond a local try-out; without it a development key is generated into the data directory. A data directory written before encryption at rest was added cannot be read: delete `data/runtime/` and reseed.
 
 Other entry points:
 
@@ -23,7 +26,11 @@ Other entry points:
 | `python run.py chat` | Hold the intake conversation yourself, one question at a time; `--resume <id>` continues a session |
 | `python run.py batch [--no-context-strategy]` | The ten-document context-window measurement (writes `docs/metrics.md`) |
 | `python run.py graph` | Prints the Mermaid diagram of the compiled graph and writes `docs/graph.mmd` |
-| `pytest -q` | The test suite (offline; tax math runs in-process) |
+| `pytest -q` | The test suite (offline; tax math runs in-process); `pytest -q tests/security` for the security tests alone |
+| `python run.py staff add NAME --role clerk\|preparer\|admin` | Create a staff account (`staff list`, `staff passwd NAME` too) |
+| `python run.py try` | One step to click through it locally: demo staff accounts (ada admin, pat preparer, cleo clerk; password `silverfile-demo-2025`), demo returns, server and browser |
+| `python run.py purge [--days N]` | Delete abandoned returns past retention (also runs at start-up) |
+| `python run.py audit` | Verify the security log's hash chain and print recent events |
 | `python evals/run_evals.py` | The eval cases with expected line values and expected escalations |
 | `docker compose up --build` | The same dashboard on port 8000 with sessions in a named volume |
 
@@ -34,6 +41,8 @@ Docker could not be run on the development machine (no Docker daemon). The Docke
 ### Sharing a demo copy
 
 `render.yaml` deploys the Dockerfile to Render's free tier with no API key of its own. Your `ANTHROPIC_API_KEY` stays in the local `.env`, which is gitignored and never copied into the image. With `SILVERFILE_REQUIRE_KEY=1` (set in the Dockerfile and `render.yaml`) the shared copy asks each visitor for their own Anthropic key before showing anything, checks it with one `models.list` call, keeps it in the server's memory under a random session id (the cookie carries only the id, HttpOnly, 12-hour sliding expiry, *Forget my key* in the header drops it) and runs the live models on it for that visitor's requests only, through the `llm.request_key` context variable. The key is never written to disk or logs and never appears in a page; each visitor's runs are billed to their account. Drop that variable to run the shared copy offline instead (the mode the tests and evals use). Vercel is not a fit: its Python runtime is serverless with no writable disk, and the dashboard keeps sessions and uploads in SQLite and on disk.
+
+The shared copy also needs a staff login: `render.yaml` has Render generate `SILVERFILE_DATA_KEY` and the first admin's password (user `admin`), which the owner reads in Render's dashboard and uses to add accounts for teammates.
 
 A fresh data directory would show an empty list, so with `SILVERFILE_SEED_DEMO=1` (set in the Dockerfile and `render.yaml`) the dashboard seeds six demo returns on its first start: two complete, one halted, two waiting on a person and one mid-conversation. They are real offline runs of the fixtures through the same service layer, with transcripts, traces and draft forms. `python run.py seed` does the same by hand (`--force` adds them even when returns exist), and the seed is a no-op once the index has rows.
 
@@ -82,7 +91,7 @@ Every one of these produces an `Escalation` record with a reason and a rulebook 
 | `review_unresolved` | Review failed `MAX_REVIEW_ROUNDS` times, or a finding needs a person | Orchestrator |
 | `loop_guard` | See above | Orchestrator |
 
-A resolution is `{"action": "continue" | "halt" | "accept", "resolved_by": ..., "note": ..., "facts_patch": {...}}`. `continue` re-runs from Eligibility with the patched facts; `halt` ends the return with the reason on the dashboard; `accept` records the item as reviewed and carries on.
+A resolution is `{"action": "continue" | "halt" | "accept", "note": ..., "facts_patch": {...}}`; the resolver and their role are taken from the logged-in session, and the patch is schema-checked. `continue` re-runs from Eligibility with the patched facts; `halt` ends the return with the reason on the dashboard; `accept` records the item as reviewed and carries on.
 
 ## Accessibility and intake design
 
@@ -92,8 +101,12 @@ The Intake agent is the only one that speaks to the taxpayer, and the choices th
 - **Drift is normal.** Answers are parsed into *any* slot, not only the one asked, so a correction three questions later still lands ("actually my wife passed in May"). Stories are acknowledged, not cut off.
 - **No arithmetic, no interpretation.** Intake asks which filing status the taxpayer *expects* to use. It never derives one. "I'm not sure" is recorded for the preparer, and escalated only where the answer changes the return (filing status after a death).
 - **Minimal PII.** Only the SSNs the form needs (taxpayer, spouse on a joint return, dependents), accepted only in the 900 test series in this proof of concept. Extra identifiers the taxpayer volunteers are noted as events, not stored as facts.
-- **Resumable by design.** Every answer is a LangGraph checkpoint in SQLite. A session can be abandoned at any question and resumed days later with the recap, by return id.
+- **Resumable by design.** Every answer is a LangGraph checkpoint in SQLite. A session can be abandoned at any question and resumed days later with the recap, with the taxpayer's access code (never by SSN or return id).
 - **Honest about uncertainty.** When an answer cannot be parsed the agent says so and asks again differently; it never guesses a value and never fills a slot from a model's assumption.
+
+## Security
+
+`docs/THREAT_MODEL.md` has the asset list, where each kind of data is stored and how, the roles, and a STRIDE table that maps every threat to its mitigation and to the test in `tests/security/` that would fail without it. In short: staff log in with roles (clerk, preparer, admin); taxpayers get a one-return access code, never a login by SSN; only 900-series SSNs are accepted anywhere and volunteered ones are removed before anything is saved; checkpoints, uploads and the index are encrypted at rest with an authenticated cipher; uploads are allow-listed by magic bytes, re-encoded (EXIF gone) and stored under random names; every form has a CSRF token and names the interrupt it answers; model output is reduced to a schema and models have no tools; each agent gets only its own `tax_math` functions; a completed draft is sealed with a signed hash chain over its provenance; escalations can only be resolved by a role that may see the filing, and every one is logged in an HMAC-chained security log; model calls are rate-limited and capped per return; and there is no filing path in the code at all. Section 8 of `docs/report.md` is honest about what this does not stop.
 
 ## Layout
 
@@ -106,13 +119,14 @@ src/silverfile/
   provenance.py       the per-line record
   memory.py           session summary; ContextWindow (section 4.5)
   batch.py            the ten-document measurement
-  service.py          session store and the dashboard's operations
-  dashboard/          FastAPI app, templates
+  service.py          session store and the dashboard's operations (authorization, security diff)
+  security/           pii, crypto, uploads, validate, injection, integrity, audit, auth, ratelimit, retention, capabilities
+  dashboard/          FastAPI app (staff and taxpayer doors), web.py (headers, CSRF, cookies), templates
   forms/render.py     draft 1040-SR as HTML (and PDF)
 data/fixtures/        synthetic cases and the batch W-2 images (generated)
 demo/                 the two walkthroughs and the synthetic W-2 images
-docs/                 graph.png, metrics.md, IMPLEMENTATION_NOTES.md, AI_DISCLOSURE.md, blueprint/ (the design-stage run)
+docs/                 graph.png, metrics.md, THREAT_MODEL.md, IMPLEMENTATION_NOTES.md, AI_DISCLOSURE.md, blueprint/ (the design-stage run)
 evals/                cases.json + run_evals.py
-tests/                pytest suite
+tests/                pytest suite; tests/security/ the security tests
 traces/               sample runs (events, provenance, token log)
 ```

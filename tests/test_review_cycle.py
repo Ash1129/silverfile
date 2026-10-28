@@ -65,11 +65,24 @@ def test_persistent_corruption_hits_the_review_bound_then_escalates():
     assert out["lines"]["9"] == 46_748.01
 
 
+def test_accepting_an_unresolved_review_cannot_complete_an_unsourced_amount():
+    """Line 9 no longer matches its provenance record: a person may accept the findings,
+    but the provenance guard in finalize still refuses to complete the draft."""
+    g, cfg, out = run_prefilled("corrupt-accept-unsourced", case1_document_list(), load_intake(CASE1), fault_injection={"corrupt_line": "9", "delta": 100, "rounds": 99})
+    assert out["status"] == "waiting_human"
+    final = resolve(g, cfg, "accept", note="shift noted for the preparer")
+    assert final["status"] == "halted"
+    assert final["halted_reason"].startswith("provenance guard: line 9")
+    assert not final.get("provenance_seal")
+
+
 def test_accepting_an_unresolved_review_completes_the_draft():
-    g, cfg, out = run_prefilled("corrupt-accept", case1_document_list(), load_intake(CASE1), fault_injection={"corrupt_line": "9", "delta": 100, "rounds": 99})
+    # the record moves with the line, so only the independent recomputation disagrees
+    g, cfg, out = run_prefilled("corrupt-accept", case1_document_list(), load_intake(CASE1), fault_injection={"corrupt_line": "9", "delta": 100, "rounds": 99, "with_record": True})
     assert out["status"] == "waiting_human"
     final = resolve(g, cfg, "accept", note="shift noted for the preparer")
     assert final["status"] == "complete"
+    assert final["provenance_seal"]["lines"] == len(final["lines"])
     assert final["review_passed"] is True
     assert final["review_round"] == MAX_REVIEW_ROUNDS  # no further review rounds ran
     assert final["computation_version"] == MAX_REVIEW_ROUNDS

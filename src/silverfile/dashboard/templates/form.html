@@ -56,6 +56,9 @@
   ul.plain { padding-left: 1.2rem; }
   @media print { body { background: #fff; } .page { box-shadow: none; margin: 0; max-width: none; } .toolbar { display: none; } .prov-card { display: none !important; } }
   @media (max-width: 40rem) { .page { padding: 1rem; } td.amount, th.amount { width: auto; } .prov-card { right: auto; left: 0; } }
+  .seal { padding: .5rem .8rem; border-radius: 4px; font-weight: 600; }
+  .seal.ok { background: #e6f3ea; color: var(--green); border: 1px solid var(--green); }
+  .seal.bad { background: #fbe9e8; color: var(--red); border: 1px solid var(--red); }
 </style>
 </head>
 <body>
@@ -97,6 +100,9 @@
   </div>
 
   {% if halted_reason %}<p class="pill bad" style="margin-top:1rem">Halted: {{ halted_reason }}</p>{% endif %}
+  {% if seal.sealed %}
+  <p class="seal {{ 'ok' if seal.ok else 'bad' }}" style="margin-top:1rem">{% if seal.ok %}Provenance seal verified: no amount or record has changed since review round {{ seal.review_round }} ({{ seal.sealed_at | when }}).{% else %}This draft does not match its provenance seal{% if seal.altered %} (line {{ seal.altered | join(", ") }} changed){% endif %}{% if not seal.signature_ok %} (signature invalid){% endif %}. Do not rely on it.{% endif %}</p>
+  {% endif %}
   {% if not has_lines %}
   <p class="muted" style="margin-top:1.5rem">No lines have been computed yet: the conversation or a person's decision is still pending. The form fills in once Computation has run.</p>
   {% endif %}
@@ -219,7 +225,7 @@
 
   <p class="banner" style="margin-top:2.5rem">{{ banner }}</p>
 </div>
-<script>
+<script{% if csp_nonce %} nonce="{{ csp_nonce }}"{% endif %}>
   // Tiny: click pins a provenance card open (hover and keyboard focus already work without this).
   document.addEventListener('click', function (e) {
     var amt = e.target.closest('.amt');

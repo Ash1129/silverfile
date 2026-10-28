@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from conftest import case1_document_list, load_intake, run_prefilled, CASE1
-from silverfile.tax_math import rules
+from silverfile.security.capabilities import AGENT_TOOLS, ToolNotAllowed
 from silverfile.tax_math.client import TaxMathClient
 
 
@@ -14,12 +14,15 @@ def mcp_env(monkeypatch):
     monkeypatch.setenv("SILVERFILE_TAXMATH_DIRECT", "0")
 
 
-def test_client_lists_the_twelve_tools_and_calls_over_stdio(mcp_env):
+def test_client_lists_only_the_computation_tools_and_calls_over_stdio(mcp_env):
+    """The server started for Computation registers its nine tools and not the eligibility tests (least privilege)."""
     with TaxMathClient() as client:
         assert client.direct is False, "the MCP server could not be started; the client fell back to direct calls"
         tools = client.list_tools()
-        assert len(tools) == 12
-        assert tools == sorted(rules.TOOL_FUNCTIONS)
+        assert tools == sorted(AGENT_TOOLS["computation"]) and len(tools) == 9
+        assert "is_1040sr_eligible" not in tools and "count_12d_boxes" not in tools
+        with pytest.raises(ToolNotAllowed):
+            client.call("is_1040sr_eligible", taxpayer_dob="1950-01-01")
         res = client.call("income_tax", filing_status="single", taxable_income=22_898.01)
         assert res["tax"] == 2_509.26
         assert res["rule"] == "REF-TX-1"
@@ -53,7 +56,7 @@ def test_direct_mode_reports_direct_transport():
     with TaxMathClient(direct=True) as client:
         client.call("sum_amounts", amounts=[1.0, 2.0])
         assert client.calls[-1].transport == "direct"
-        assert client.list_tools() == sorted(rules.TOOL_FUNCTIONS)
+        assert client.list_tools() == sorted(AGENT_TOOLS["computation"])
 
 
 def test_full_graph_run_over_mcp_marks_provenance_transport(mcp_env):

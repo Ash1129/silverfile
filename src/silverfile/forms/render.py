@@ -13,18 +13,18 @@ from __future__ import annotations
 
 import io
 import json
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 
 from ..provenance import ALL_LINES, LINE_LABELS
+from ..security import integrity, pii
 
 TEMPLATES_DIR = Path(__file__).resolve().parents[1] / "dashboard" / "templates"
 BANNER = "DRAFT — prepared by SilverFile for review by a Kushim preparer. Not filed. Not advice."
-SSN_RE = re.compile(r"\b(\d{3})[- ]?(\d{2})[- ]?(\d{4})\b")
+SSN_RE = pii.SSN_RE
 
 FILING_STATUS_LABELS = {"single": "Single", "mfj": "Married filing jointly", "mfs": "Married filing separately", "hoh": "Head of household", "qss": "Qualifying surviving spouse"}
 BOX_LABELS_12D = [("taxpayer_65", "You were born before January 2, 1961"), ("taxpayer_blind", "You are blind"), ("spouse_65", "Spouse was born before January 2, 1961"), ("spouse_blind", "Spouse is blind")]
@@ -41,21 +41,9 @@ STATUS_LABELS = {"new": "New", "intake": "In conversation", "extracting": "Readi
 
 
 # ---------------------------------------------------------------- small helpers (also used as Jinja filters)
-def mask_ssn(value: Any) -> str:
-    """Show only the last four digits of anything that looks like an SSN."""
-    if value in (None, ""):
-        return ""
-    return SSN_RE.sub(lambda m: f"***-**-{m.group(3)}", str(value))
-
-
-def mask_ssn_deep(obj: Any) -> Any:
-    if isinstance(obj, dict):
-        return {k: mask_ssn_deep(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [mask_ssn_deep(v) for v in obj]
-    if isinstance(obj, str):
-        return mask_ssn(obj)
-    return obj
+# one implementation of masking for the dashboard, the form and the PDF (security/pii.py)
+mask_ssn = pii.mask
+mask_ssn_deep = pii.mask_deep
 
 
 def fmt_money(value: Any) -> str:
@@ -99,7 +87,7 @@ def jinja_env() -> Environment:
     """One Jinja2 environment shared by render_html and the dashboard, with the same filters."""
     global _env
     if _env is None:
-        env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=select_autoescape(["html", "xml"]), trim_blocks=True, lstrip_blocks=True)
+        env = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=True, trim_blocks=True, lstrip_blocks=True)
         env.filters.update(money=fmt_money, when=fmt_when, mask=mask_ssn, pretty=pretty, status_label=status_label, fs_label=filing_status_label)
         env.globals.update(BANNER=BANNER)
         _env = env
@@ -183,11 +171,14 @@ def form_context(state: dict[str, Any], dashboard_url: str | None = None) -> dic
         "escalations": list(state.get("escalations") or []),
         "noted_questions": list(facts.get("noted_questions") or []),
         "halted_reason": state.get("halted_reason"),
+        "seal": integrity.verify(state),
     }
 
 
-def render_html(state: dict[str, Any], dashboard_url: str | None = None) -> str:
-    return jinja_env().get_template("form.html").render(**form_context(state, dashboard_url=dashboard_url))
+def render_html(state: dict[str, Any], dashboard_url: str | None = None, csp_nonce: str | None = None) -> str:
+    """The draft as a standalone page. Every value is autoescaped (extracted text included);
+    `csp_nonce` lets its one inline script run under the dashboard's Content-Security-Policy."""
+    return jinja_env().get_template("form.html").render(**form_context(state, dashboard_url=dashboard_url), csp_nonce=csp_nonce)
 
 
 # ---------------------------------------------------------------- PDF

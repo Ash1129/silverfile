@@ -72,6 +72,10 @@ class DocumentInput(TypedDict, total=False):
     payload: dict[str, Any] | None  # typed fields supplied directly (fixtures / dashboard form)
     declared_by: str  # "taxpayer" | "fixture" | "dashboard"
     uploaded_at: str
+    media_type: str  # for uploads: the type identified from the file's bytes (security/uploads.py)
+    original_name: str  # for uploads: the cleaned file name, a label only (the stored name is random)
+    sha256: str
+    size: int
 
 
 class ExtractedDocument(TypedDict, total=False):
@@ -88,6 +92,7 @@ class ExtractedDocument(TypedDict, total=False):
     extracted_at: str
     tokens_in: int
     tokens_out: int
+    security_flags: list[str]  # prompt-injection text, an SSN in a text field, an implausible amount (security/validate.py)
 
 
 class Provenance(TypedDict, total=False):
@@ -232,6 +237,7 @@ class ReturnState(TypedDict, total=False):
     review_history: Annotated[list[ReviewRound], operator.add]
     review_round: int
     review_passed: bool
+    provenance_seal: dict[str, Any] | None  # hash chain over every line's provenance, signed (security/integrity.py)
     revise_target: str | None
     revise_reasons: list[str]
     # escalation / HITL

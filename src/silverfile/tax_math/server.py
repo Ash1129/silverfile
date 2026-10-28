@@ -7,6 +7,7 @@ result of a tool call that can be logged with its inputs.
 from __future__ import annotations
 
 import functools
+import os
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -27,7 +28,12 @@ def _wrap(fn):
     return inner
 
 
+# The client starts one server per agent and names that agent's tools (security/capabilities.py);
+# the server registers only those, so a tool the agent may not use does not exist in its session.
+_only = {t for t in os.environ.get("SILVERFILE_TAXMATH_TOOLS", "").split(",") if t}
 for _name, _fn in rules.TOOL_FUNCTIONS.items():
+    if _only and _name not in _only:
+        continue
     server.tool(name=_name, description=(_fn.__doc__ or _name).strip().splitlines()[0])(_wrap(_fn))
 
 

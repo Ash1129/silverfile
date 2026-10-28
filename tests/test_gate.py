@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from silverfile import llm
 from silverfile.dashboard import gate
 from silverfile.dashboard.app import create_app
+from webhelpers import anon_token, login
 
 GOOD = "sk-ant-api03-" + "x" * 60
 
@@ -44,6 +45,9 @@ def test_gate_is_off_locally(tmp_path, monkeypatch):
     monkeypatch.delenv("SILVERFILE_SEED_DEMO", raising=False)
     assert not gate.gate_enabled()
     with TestClient(create_app()) as client:
+        r = client.get("/", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/login"  # no key page, straight to staff login
+        login(client, "gate-local")
         r = client.get("/")
         assert r.status_code == 200 and "Start a return" in r.text and "api_key" not in r.text
         assert client.get("/key", follow_redirects=False).status_code == 303
@@ -68,24 +72,27 @@ def test_every_page_asks_for_a_key_first(shared):
 
 def test_bad_keys_are_refused_without_a_session(shared):
     client, checked = shared
-    r = client.post("/key", data={"api_key": "hello"})
+    r = client.post("/key", data={"api_key": "hello", "csrf_token": anon_token(client)})
     assert r.status_code == 400 and "start with sk-ant-" in r.text
-    r = client.post("/key", data={"api_key": GOOD + "bad"})
+    r = client.post("/key", data={"api_key": GOOD + "bad", "csrf_token": anon_token(client)})
     assert r.status_code == 400 and "rejected" in r.text
     assert gate.SESSION_COOKIE not in client.cookies and checked == []
 
 
 def test_a_good_key_opens_the_dashboard_and_can_be_forgotten(shared):
     client, checked = shared
-    r = client.post("/key", data={"api_key": "  " + GOOD + "  "}, follow_redirects=False)
+    assert client.post("/key", data={"api_key": GOOD}).status_code == 403  # no CSRF token, no key
+    assert checked == []
+    r = client.post("/key", data={"api_key": "  " + GOOD + "  ", "csrf_token": anon_token(client)}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/"
     assert checked == [GOOD]
     sid = client.cookies.get(gate.SESSION_COOKIE)
     assert sid and GOOD not in sid and gate.session_key(sid) == GOOD
+    csrf = login(client, "gate-shared")  # past the key gate, the dashboard still needs a staff login
     r = client.get("/")
     assert r.status_code == 200 and "Start a return" in r.text and "Forget my key" in r.text
     assert GOOD not in r.text
-    r = client.post("/key/forget", follow_redirects=False)
+    r = client.post("/key/forget", data={"csrf_token": csrf}, follow_redirects=False)
     assert r.status_code == 303 and gate.session_key(sid) is None
     assert 'name="api_key"' in client.get("/").text
 
@@ -106,7 +113,7 @@ def test_the_session_key_reaches_the_model_door(shared):
 
     assert client.get("/_probe").status_code == 200  # gated: the key page, not the probe
     assert seen == []
-    client.post("/key", data={"api_key": GOOD})
+    client.post("/key", data={"api_key": GOOD, "csrf_token": anon_token(client)})
     assert client.get("/_probe").json() == {"available": True}
     assert seen == [GOOD, GOOD]
     assert llm.current_key() is None  # nothing leaks outside the request

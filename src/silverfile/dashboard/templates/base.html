@@ -3,15 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}SilverFile{% endblock %} — Kushim dashboard</title>
+<meta name="referrer" content="no-referrer">
+<title>{% block title %}SilverFile{% endblock %} — {% block site %}Kushim dashboard{% endblock %}</title>
 <link rel="stylesheet" href="/static/style.css">
 {% block head %}{% endblock %}
 </head>
 <body>
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="/">SilverFile <span>Kushim preparer dashboard</span></a>
-    <nav><a href="/">All returns</a>{% if request.state.key_session %}<form method="post" action="/key/forget"><button class="linkish" type="submit" title="Drop your API key from this server's memory">Forget my key</button></form>{% endif %}</nav>
+    {% block brand %}<a class="brand" href="/">SilverFile <span>Kushim preparer dashboard</span></a>{% endblock %}
+    <nav>
+      {% block nav %}
+      {% if me and me.kind == "staff" %}
+        <a href="/">Returns</a>{% if can("view_audit") %}<a href="/audit">Security log</a>{% endif %}
+        <span class="who-am-i">{{ me.subject }} · {{ me.role }}</span>
+        <form method="post" action="/logout" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="linkish" type="submit">Log out</button></form>
+      {% endif %}
+      {% endblock %}
+      {% if request.state.key_session %}<form method="post" action="/key/forget" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="linkish" type="submit" title="Drop your API key from this server's memory">Forget my key</button></form>{% endif %}
+    </nav>
   </div>
 </header>
 <div class="draft-strip">{{ BANNER }}</div>

@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Offline, in-process tax_math; set before silverfile is imported (its .env loader uses setdefault).
 os.environ["ANTHROPIC_API_KEY"] = ""
 os.environ.setdefault("SILVERFILE_TAXMATH_DIRECT", "1")
+os.environ.setdefault("SILVERFILE_ALLOW_FAULTS", "1")  # some cases inject faults (the hook is off outside tests and evals)
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 

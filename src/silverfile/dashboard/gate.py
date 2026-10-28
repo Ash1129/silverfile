@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover - the SDK is a hard requirement, this ke
 
 SESSION_COOKIE = "sf_key_session"
 TTL_SECONDS = 12 * 3600
-EXEMPT_PATHS = {"/key", "/key/forget", "/favicon.ico"}
+EXEMPT_PATHS = {"/key", "/key/forget", "/favicon.ico", "/healthz"}
 EXEMPT_PREFIXES = ("/static/",)
 KEY_PREFIX = "sk-ant-"
 
@@ -121,7 +121,7 @@ def secure_cookie(request: Request) -> bool:
 
 
 def set_session_cookie(response: Response, request: Request, sid: str) -> None:
-    response.set_cookie(SESSION_COOKIE, sid, max_age=TTL_SECONDS, httponly=True, samesite="lax", secure=secure_cookie(request), path="/")
+    response.set_cookie(SESSION_COOKIE, sid, max_age=TTL_SECONDS, httponly=True, samesite="strict", secure=secure_cookie(request), path="/")
 
 
 def clear_session_cookie(response: Response) -> None:

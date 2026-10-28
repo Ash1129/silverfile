@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Your access code{% endblock %}
+{% block site %}SilverFile{% endblock %}
+{% block brand %}<span class="brand">SilverFile <span>for Kushim taxpayers</span></span>{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+<section class="card gate">
+  <h1>Your access code</h1>
+  <p>Write this down or keep it somewhere safe. You need it to come back to your answers later. It is shown only once.</p>
+  <p class="access-code"><code>{{ code }}</code></p>
+  <p class="muted small">Do not share it: anyone with the code can continue this return. Kushim staff will never ask you for it.</p>
+  <p><a class="button primary" href="/t">I have saved it, continue</a></p>
+</section>
+{% endblock %}

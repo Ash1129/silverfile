@@ -35,6 +35,8 @@ from .agents.orchestrator import orchestrator_node, route
 from .agents.review import run_review
 from .config import settings
 from .provenance import now_iso
+from .security import crypto, integrity
+from .security.validate import provenance_problems
 from .state import ReturnState
 
 
@@ -44,7 +46,13 @@ def finalize_node(state: ReturnState) -> dict[str, Any]:
     elig = state.get("eligibility") or {}
     if not elig.get("eligible_1040sr") or not elig.get("in_scope") or not elig.get("chart_applies", True):
         return {"status": "halted", "halted_reason": "not eligible or out of scope; a Kushim preparer takes it from here", "handoffs": ["finalize"], "events": ["finalize: halted (eligibility/scope)"]}
-    return {"status": "complete", "handoffs": ["finalize"], "events": [f"finalize: draft complete at {now_iso()} after {state.get('review_round', 0)} review round(s)"]}
+    # the last structural gate: no draft completes with an amount that is not sourced, whoever accepted it
+    unsourced = provenance_problems(state)
+    if unsourced:
+        why = "; ".join(f"line {l}: {p}" for l, p in unsourced[:4])
+        return {"status": "halted", "halted_reason": f"provenance guard: {why}", "handoffs": ["finalize"], "events": [f"finalize: halted, {len(unsourced)} unsourced amount(s)"]}
+    sealed = integrity.seal(state)
+    return {"status": "complete", "provenance_seal": sealed, "handoffs": ["finalize"], "events": [f"finalize: draft complete at {now_iso()} after {state.get('review_round', 0)} review round(s); provenance sealed ({sealed['lines']} lines, root {sealed['root'][:12]})"]}
 
 
 def build_graph():
@@ -72,12 +80,20 @@ _compiled: dict[str, Any] = {}
 
 
 def get_checkpointer(path: str | Path | None = None):
+    """SQLite checkpoints, every blob encrypted with an authenticated cipher (security/crypto.py).
+
+    An unencrypted or altered blob fails to load, so a checkpoint cannot be edited
+    or forged without the data key. ":memory:" (CLI demos and tests) stays in the process.
+    """
     if path is None:
         path = settings().checkpoint_db
     if str(path) == ":memory:":
         return InMemorySaver()
+    fresh = not Path(path).exists()
     conn = sqlite3.connect(str(path), check_same_thread=False)
-    return SqliteSaver(conn)
+    if fresh:
+        crypto.restrict_file(Path(path))
+    return SqliteSaver(conn, serde=crypto.checkpoint_serde())
 
 
 def compile_graph(checkpointer=None):

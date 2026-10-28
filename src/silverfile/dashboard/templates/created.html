@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Return {{ "access code" if reissued else "created" }}{% endblock %}
+{% block content %}
+<section class="card gate">
+  <h1>{% if reissued %}New access code{% else %}Return created{% endif %} <code class="small">{{ rid }}</code></h1>
+  {% if code %}
+  <p>Give the taxpayer this access code. It opens this one return's conversation and nothing else. It is shown only once{% if reissued %}; the earlier code no longer works{% endif %}.</p>
+  <p class="access-code"><code>{{ code }}</code></p>
+  <form method="post" action="/resume" target="_blank" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ anon_csrf }}">
+    <input type="hidden" name="code" value="{{ code }}">
+    <button class="button" type="submit">Open the taxpayer's view in a new tab (demo)</button>
+  </form>
+  <p class="muted small">The taxpayer's session is separate from yours: it sees only the questions, and you cannot answer for the taxpayer from the dashboard.</p>
+  {% else %}
+  <p>The intake was prefilled, so there is no conversation and no access code.</p>
+  {% endif %}
+  <p>{% if can("view_return") %}<a class="button primary" href="/returns/{{ rid }}">Open the return</a> {% endif %}<a class="button" href="/">All returns</a></p>
+</section>
+{% endblock %}

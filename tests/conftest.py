@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,12 @@ import pytest
 # but .env is loaded with setdefault at import, so our values must already be there).
 os.environ["ANTHROPIC_API_KEY"] = ""
 os.environ["SILVERFILE_TAXMATH_DIRECT"] = "1"
+os.environ["SILVERFILE_ALLOW_FAULTS"] = "1"  # the fault-injection hook is off everywhere else
+os.environ["SILVERFILE_DATA_KEY"] = "test-only-data-key-not-a-secret-0123456789"
+os.environ.pop("SILVERFILE_ENV", None)
+# never the checkout's own data/runtime: tests that need a fresh one still set their own
+os.environ["SILVERFILE_DATA_DIR"] = tempfile.mkdtemp(prefix="silverfile-tests-")
+os.environ.pop("SILVERFILE_ADMIN_PASSWORD", None)
 
 from langgraph.types import Command  # noqa: E402
 
@@ -109,3 +116,29 @@ def case1_answers() -> list[str]:
 @pytest.fixture
 def graph():
     return new_graph()
+
+
+# ---------------------------------------------------------------- dashboard and service fixtures (tests/security)
+@pytest.fixture
+def data_dir(tmp_path, monkeypatch):
+    """A fresh data directory: its own checkpoints, index, accounts and security log."""
+    d = tmp_path / "runtime"
+    monkeypatch.setenv("SILVERFILE_DATA_DIR", str(d))
+    monkeypatch.delenv("SILVERFILE_SEED_DEMO", raising=False)
+    monkeypatch.delenv("SILVERFILE_REQUIRE_KEY", raising=False)
+    from silverfile.security import ratelimit
+
+    ratelimit.reset_all()
+    return d
+
+
+@pytest.fixture
+def web(data_dir):
+    """The dashboard app with its start-up run; tests open their own TestClients on it."""
+    from fastapi.testclient import TestClient
+
+    from silverfile.dashboard.app import create_app
+
+    app = create_app()
+    with TestClient(app):
+        yield app

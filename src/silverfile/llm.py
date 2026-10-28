@@ -8,6 +8,11 @@ for the duration of a request so that a visitor's own key is used for their
 runs and nothing else. The context variable wins. Context is copied into the
 threads the graph runs on (starlette's run_in_threadpool and LangGraph's
 executor both do that), so the agents need no plumbing.
+
+Every call is charged to the return in `current_return` (the service layer sets
+it around each graph invoke) and checked against that return's budget first
+(security/ratelimit.py). The models are given no tools: a call can only return
+text, which the agents then parse into a fixed schema.
 """
 from __future__ import annotations
 
@@ -53,6 +58,7 @@ class LLMResult:
 
 
 request_key: contextvars.ContextVar[str | None] = contextvars.ContextVar("silverfile_request_key", default=None)
+current_return: contextvars.ContextVar[str | None] = contextvars.ContextVar("silverfile_current_return", default=None)
 
 _clients: dict[str, Any] = {}
 
@@ -91,16 +97,32 @@ def estimate_tokens(text: str) -> int:
 
 
 def complete(system: str, messages: list[dict[str, Any]], *, model: str, max_tokens: int = 1200) -> LLMResult:
-    """Call Claude with a system prompt and a list of {role, content} messages."""
+    """Call Claude with a system prompt and a list of {role, content} messages (no tools, by design)."""
+    from .security import audit, ratelimit
+
+    scope = current_return.get()
+    try:
+        ratelimit.check(scope, max_tokens)
+    except ratelimit.BudgetExceeded as e:
+        audit.record("budget_exceeded", return_id=scope, model=model, reason=str(e))
+        raise
     resp = client().messages.create(model=model, system=system, messages=messages, max_tokens=max_tokens)
     text = "".join(getattr(b, "text", "") for b in resp.content)
     u = resp.usage
     tokens_in = int(getattr(u, "input_tokens", 0) or 0) + int(getattr(u, "cache_read_input_tokens", 0) or 0) + int(getattr(u, "cache_creation_input_tokens", 0) or 0)
-    return LLMResult(text=text, tokens_in=tokens_in, tokens_out=int(getattr(u, "output_tokens", 0) or 0), model=model)
+    tokens_out = int(getattr(u, "output_tokens", 0) or 0)
+    ratelimit.record(scope, tokens_in, tokens_out)
+    return LLMResult(text=text, tokens_in=tokens_in, tokens_out=tokens_out, model=model)
 
 
-def image_block(path: str | Path) -> dict[str, Any]:
+def image_block(path: str | Path, data: bytes | None = None, media_type: str | None = None) -> dict[str, Any]:
+    """An image content block; `data` (already-decrypted bytes) wins over reading `path`."""
     p = Path(path)
-    mime = mimetypes.guess_type(str(p))[0] or "image/jpeg"
-    data = base64.b64encode(p.read_bytes()).decode("ascii")
-    return {"type": "image", "source": {"type": "base64", "media_type": mime, "data": data}}
+    mime = media_type or mimetypes.guess_type(str(p))[0] or "image/jpeg"
+    raw = data if data is not None else p.read_bytes()
+    return {"type": "image", "source": {"type": "base64", "media_type": mime, "data": base64.b64encode(raw).decode("ascii")}}
+
+
+def document_block(data: bytes) -> dict[str, Any]:
+    """A PDF content block."""
+    return {"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": base64.b64encode(data).decode("ascii")}}

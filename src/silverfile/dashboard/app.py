@@ -1,29 +1,41 @@
-"""The Kushim dashboard: list returns, run the taxpayer conversation, resolve
-escalations, read the agent trace, and open the draft form (HTML / PDF).
+"""The Kushim dashboard and the taxpayer's conversation, behind separate doors.
+
+Staff (Kushim employees) log in and see what their role allows: a clerk opens
+returns and hands out access codes; a preparer reads drafts and resolves
+escalations; an admin also reads the security log and deletes returns.
+Taxpayers never log in with an SSN: starting a return gives them an access
+code, and their session opens only their own return, only its conversation.
+A taxpayer cannot see a draft, an escalation's details, another return, or
+any page that drives the agents; their only input is an answer to the
+question the Intake agent asked.
 
 Everything goes through silverfile.service so the CLI and the tests share the
-same code path. Works offline (no API key): the graph then uses its scripted
-intake parser, fixture / sidecar extraction and rules-only review.
+same code path (and the same permission checks). Works offline (no API key).
 
 Run:  uvicorn silverfile.dashboard.app:create_app --factory --port 8765
 """
 from __future__ import annotations
 
 import json
+import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile  # what request.form() returns (FastAPI's UploadFile is a subclass, so isinstance against it never matched)
 
 from .. import seed, service
-from . import gate
 from ..forms.render import jinja_env, render_html, render_pdf, status_label
 from ..memory import session_summary
+from ..security import audit, auth, integrity, ratelimit, retention, uploads
+from ..security.pii import install_log_redaction
+from . import gate, web
+from .web import CSRFFailed, LoginRequired, check_return_id, require_staff, require_taxpayer, verify_csrf
 
 HERE = Path(__file__).resolve().parent
 BUSY_STATUSES = ("extracting", "eligibility", "computing", "review")
@@ -32,24 +44,89 @@ FILING_STATUSES = [("", "leave as is"), ("single", "Single"), ("mfj", "Married f
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    """With SILVERFILE_SEED_DEMO set and an empty index, seed the demo returns
-    before serving (see seed.py), so a fresh deployment is not an empty list."""
+    """On start: create the first admin from the environment if there is no staff
+    account, delete abandoned returns past retention, then (if asked) seed the demo set."""
+    install_log_redaction()
+    if await run_in_threadpool(auth.bootstrap_admin_from_env):
+        sys.stderr.write("[silverfile] created the first admin account from SILVERFILE_ADMIN_USER\n")
+    elif not await run_in_threadpool(auth.staff_count):
+        sys.stderr.write("[silverfile] no staff account yet: run `python run.py staff add <name> --role admin` (or set SILVERFILE_ADMIN_USER and SILVERFILE_ADMIN_PASSWORD)\n")
+    await run_in_threadpool(retention.purge_abandoned)
     if seed.seed_enabled():
         await run_in_threadpool(seed.seed_demo_returns)
     yield
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="SilverFile dashboard", docs_url=None, redoc_url=None, lifespan=_lifespan)
+    app = FastAPI(title="SilverFile dashboard", docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
     templates = Jinja2Templates(env=jinja_env())
 
     def page(request: Request, name: str, status_code: int = 200, **ctx: Any) -> HTMLResponse:
+        me = getattr(request.state, "principal", None)
+        ctx.setdefault("me", me)
+        ctx.setdefault("can", (lambda perm: bool(me and me.can(perm))))
+        ctx.setdefault("csrf", web.csrf_for(request))
+        ctx.setdefault("csp_nonce", request.state.csp_nonce)
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
-    # ------------------------------------------------------------ key gate (shared copies only; see gate.py)
-    app.add_middleware(gate.KeyGate, render_gate=lambda request: page(request, "key.html"))
+    def error(request: Request, status_code: int, title: str, message: str, back: str = "/") -> HTMLResponse:
+        return page(request, "error.html", status_code=status_code, title=title, message=message, back=web.safe_next(back))
 
+    # ------------------------------------------------------------ middleware (the last added runs first)
+    app.add_middleware(gate.KeyGate, render_gate=lambda request: page(request, "key.html"))
+    app.add_middleware(web.SecurityMiddleware)
+
+    # ------------------------------------------------------------ errors
+    @app.exception_handler(LoginRequired)
+    async def _login_required(request: Request, exc: LoginRequired):
+        if exc.kind == "taxpayer":
+            return RedirectResponse("/start", status_code=303)
+        if request.method in ("GET", "HEAD"):
+            return RedirectResponse(f"/login?next={request.url.path}", status_code=303)
+        return error(request, 401, "Please log in", "Your session has ended. Log in again to continue.", "/login")
+
+    @app.exception_handler(PermissionError)
+    async def _forbidden(request: Request, exc: PermissionError):
+        return error(request, 403, "Not allowed", str(exc) or "You are not allowed to do that.")
+
+    @app.exception_handler(CSRFFailed)
+    async def _csrf(request: Request, exc: CSRFFailed):
+        return error(request, 403, "The form expired", "That form could not be verified (it may have been open too long, or sent from another site). Reload the page and try again.", request.headers.get("referer") or "/")
+
+    @app.exception_handler(ratelimit.RateLimited)
+    async def _limited(request: Request, exc: ratelimit.RateLimited):
+        audit.record("rate_limited", path=request.url.path, ip=web.client_ip(request))
+        r = error(request, 429, "Too many attempts", f"Please wait {exc.retry_after} seconds and try again.")
+        r.headers["Retry-After"] = str(exc.retry_after)
+        return r
+
+    @app.exception_handler(service.StateRejected)
+    async def _rejected(request: Request, exc: service.StateRejected):
+        return error(request, 409, "This return was not loaded", str(exc))
+
+    @app.exception_handler(gate.AuthFailed)
+    async def _key_rejected(request: Request, exc: gate.AuthFailed):
+        gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
+        response = page(request, "key.html", status_code=401, error="Anthropic rejected your key mid-run (revoked, or out of credit). Enter a working key to continue.")
+        gate.clear_session_cookie(response)
+        return response
+
+    @app.exception_handler(service.ServiceError)
+    async def _bad_request(request: Request, exc: service.ServiceError):
+        return error(request, 409 if isinstance(exc, service.Stale) else 400, "That did not fit the return's current state", str(exc), request.headers.get("referer") or "/")
+
+    @app.exception_handler(KeyError)
+    async def _not_found(request: Request, exc: KeyError):
+        # the same answer whether the return does not exist or the visitor may not see it
+        return error(request, 404, "No such return", "There is no return with that id here.")
+
+    # ------------------------------------------------------------ health
+    @app.get("/healthz")
+    async def healthz():
+        return Response("ok", media_type="text/plain")
+
+    # ------------------------------------------------------------ key gate (shared copies only; see gate.py)
     @app.get("/key", response_class=HTMLResponse)
     async def key_page(request: Request):
         if not gate.gate_enabled():
@@ -60,6 +137,7 @@ def create_app() -> FastAPI:
     async def key_submit(request: Request, api_key: str = Form("")):
         if not gate.gate_enabled():
             return RedirectResponse("/", status_code=303)
+        await verify_csrf(request)
         try:
             key = await run_in_threadpool(gate.validate_key, api_key)
         except ValueError as e:
@@ -71,141 +149,284 @@ def create_app() -> FastAPI:
 
     @app.post("/key/forget")
     async def key_forget(request: Request):
+        await verify_csrf(request, web.staff(request) or web.taxpayer(request))
         gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
         response = RedirectResponse("/key" if gate.gate_enabled() else "/", status_code=303)
         gate.clear_session_cookie(response)
         return response
 
-    @app.exception_handler(gate.AuthFailed)
-    async def _key_rejected(request: Request, exc: gate.AuthFailed):
-        gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
-        response = page(request, "key.html", status_code=401, error="Anthropic rejected your key mid-run (revoked, or out of credit). Enter a working key to continue.")
-        gate.clear_session_cookie(response)
+    # ------------------------------------------------------------ staff login
+    @app.get("/login", response_class=HTMLResponse)
+    async def login_page(request: Request, next: str = "/"):
+        if web.staff(request):
+            return RedirectResponse(web.safe_next(next), status_code=303)
+        return page(request, "login.html", next=web.safe_next(next), no_staff=not auth.staff_count())
+
+    @app.post("/login")
+    async def login(request: Request, username: str = Form(""), password: str = Form(""), next: str = Form("/")):
+        await verify_csrf(request)
+        ratelimit.LOGIN.hit(web.client_ip(request))
+        p = await run_in_threadpool(auth.authenticate, username, password, ip=web.client_ip(request))
+        if p is None:
+            return page(request, "login.html", status_code=401, next=web.safe_next(next), error="That username and password do not match an active account (after five wrong tries an account is locked for fifteen minutes).")
+        auth.end_session(request.cookies.get(web.STAFF_COOKIE))
+        token, _ = auth.start_session(p)
+        response = RedirectResponse(web.safe_next(next), status_code=303)
+        web.set_cookie(response, request, web.STAFF_COOKIE, token, auth.STAFF_MAX_SECONDS)
         return response
 
-    @app.exception_handler(service.ServiceError)
-    async def _bad_request(request: Request, exc: service.ServiceError):
-        return page(request, "error.html", status_code=400, title="That did not fit the return's current state", message=str(exc), back=request.headers.get("referer") or "/")
+    @app.post("/logout")
+    async def logout(request: Request):
+        me = web.staff(request)
+        await verify_csrf(request, me)
+        auth.end_session(request.cookies.get(web.STAFF_COOKIE))
+        if me:
+            audit.record("logout", actor=me.label)
+        response = RedirectResponse("/login", status_code=303)
+        web.clear_cookie(response, web.STAFF_COOKIE)
+        return response
 
-    @app.exception_handler(KeyError)
-    async def _not_found(request: Request, exc: KeyError):
-        return page(request, "error.html", status_code=404, title="No such return", message=f"Return {exc.args[0] if exc.args else ''} is not in this dashboard's data directory.", back="/")
-
-    # ------------------------------------------------------------ list / new
+    # ------------------------------------------------------------ the front door
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
+        me = web.staff(request)
+        if me is None:
+            if web.taxpayer(request):
+                return RedirectResponse("/t", status_code=303)
+            return RedirectResponse("/login", status_code=303)
+        request.state.principal = me
+        if not me.can("list_returns"):
+            raise PermissionError("Your role does not allow listing returns.")
         rows = await run_in_threadpool(service.list_returns)
-        return page(request, "index.html", rows=rows, fixtures=service.list_fixtures(), needs_person=sum(1 for r in rows if r.get("waiting_on_human")))
+        if not me.can("view_return"):
+            rows = [{**r, "summary": None} for r in rows]  # a clerk sees who and where, not the details
+        return page(request, "index.html", rows=rows, fixtures=service.list_fixtures(), needs_person=sum(1 for r in rows if r.get("waiting_on_human")), accept=uploads.ACCEPT)
 
+    # ------------------------------------------------------------ staff: returns
     @app.post("/returns/new")
     async def new_return(request: Request):
+        me = require_staff(request, "create_return")
+        await verify_csrf(request, me)
+        ratelimit.STAFF_WRITE.hit(me.subject)
         form = await request.form()
         fixture = (form.get("fixture") or "").strip() or None
         prefilled = form.get("prefilled") in ("1", "on", "true")
         rid = service.new_return_id()
+        files = [f for f in form.getlist("files") if isinstance(f, UploadFile) and f.filename]
+        if len(files) > uploads.MAX_FILES:
+            raise service.ServiceError(f"At most {uploads.MAX_FILES} files at a time.")
         docs: list[dict[str, Any]] = []
-        for f in form.getlist("files"):
-            if isinstance(f, UploadFile) and f.filename:
-                docs.append(service.save_upload(rid, f.filename, await f.read()))
+        for f in files:
+            docs.append(service.save_upload(rid, f.filename, await f.read(uploads.max_bytes() + 1), actor=me))
         intake = None
         if fixture:
             docs.extend(service.fixture_documents(fixture))
             if prefilled:
                 intake = service.fixture_intake(fixture)
-        await run_in_threadpool(service.create_return, docs, intake, None, return_id=rid, fixture=fixture)
-        await run_in_threadpool(service.run, rid)
-        return RedirectResponse(f"/returns/{rid}", status_code=303)
+        await run_in_threadpool(lambda: service.create_return(docs, intake, None, return_id=rid, fixture=fixture, actor=me))
+        await run_in_threadpool(service.run, rid, me)
+        code = auth.issue_access_code(rid) if intake is None else None
+        if code:
+            audit.record("access_code_issued", actor=me.label, return_id=rid)
+        return page(request, "created.html", rid=rid, code=code, fixture=fixture, anon_csrf=request.state.anon_csrf)
 
-    # ------------------------------------------------------------ one return
     @app.get("/returns/{rid}", response_class=HTMLResponse)
     async def show_return(request: Request, rid: str):
+        me = require_staff(request, "view_return")
+        check_return_id(rid)
         state = await run_in_threadpool(service.get_state, rid)
         pend = service.pending(rid)
         row = service.index_row(rid) or {}
         open_esc = [e for e in state.get("escalations", []) if e.get("status") == "open"]
         return page(
-            request, "return.html", rid=rid, state=state, pending=pend, row=row, fixture=row.get("fixture"),
+            request, "return.html", rid=rid, state=state, pending=pend, pending_id=service.pending_id(rid), row=row, fixture=row.get("fixture"),
             transcript=service.transcript_from_state(state), summary=session_summary(state), open_escalations=open_esc,
             escalation=(pend.get("escalation") if pend and pend.get("type") == "escalation" else (open_esc[0] if open_esc else None)),
             documents_in=state.get("documents_in") or [], filing_statuses=FILING_STATUSES,
             auto_refresh=state.get("status") in BUSY_STATUSES, busy=BUSY_STATUSES, status_text=status_label(state.get("status")),
-            hop_chain=_compress_hops(state.get("handoffs") or []),
+            hop_chain=_compress_hops(state.get("handoffs") or []), seal=integrity.verify(state),
+            security_events=audit.recent(20, return_id=rid) if me.can("view_audit") else [],
         )
 
-    @app.post("/returns/{rid}/answer")
-    async def answer(rid: str, text: str = Form(""), use_fixture: str | None = Form(None)):
-        pend = service.pending(rid)
-        docs: list[dict[str, Any]] = []
-        if pend and pend.get("type") == "upload":
-            # the fixture's documents are attached at the upload step automatically; they may already be on the return
-            row = service.index_row(rid) or {}
-            if row.get("fixture"):
-                docs = _not_yet_attached(rid, service.fixture_documents(row["fixture"]))
-            text = text.strip() or "done"
-        await run_in_threadpool(service.answer, rid, text.strip(), docs or None)
-        return RedirectResponse(f"/returns/{rid}", status_code=303)
-
-    @app.post("/returns/{rid}/upload")
-    async def upload(request: Request, rid: str):
-        form = await request.form()
-        docs: list[dict[str, Any]] = []
-        for f in form.getlist("files"):
-            if isinstance(f, UploadFile) and f.filename:
-                docs.append(service.save_upload(rid, f.filename, await f.read()))
-        if form.get("use_fixture"):
-            row = service.index_row(rid) or {}
-            if row.get("fixture"):
-                docs.extend(_not_yet_attached(rid, service.fixture_documents(row["fixture"])))
-        text = (form.get("text") or "").strip() or "done"
-        pend = service.pending(rid)
-        if not pend or pend.get("type") != "upload":
-            raise service.ServiceError("The conversation is not at the upload step; answer the current question first.")
-        await run_in_threadpool(service.answer, rid, text, docs)
-        return RedirectResponse(f"/returns/{rid}", status_code=303)
-
     @app.post("/returns/{rid}/resolve")
-    async def resolve(rid: str, action: str = Form(...), resolved_by: str = Form("kushim-employee"), note: str = Form(""), filing_status: str = Form(""), facts_patch: str = Form("")):
+    async def resolve(request: Request, rid: str, action: str = Form(...), note: str = Form(""), filing_status: str = Form(""), facts_patch: str = Form(""), interrupt_id: str = Form("")):
+        me = require_staff(request, "resolve_escalation")
+        check_return_id(rid)
+        await verify_csrf(request, me)
+        ratelimit.STAFF_WRITE.hit(me.subject)
         patch: dict[str, Any] = {}
         if facts_patch.strip():
             try:
                 parsed = json.loads(facts_patch)
             except json.JSONDecodeError as e:
-                raise service.ServiceError(f"facts_patch is not valid JSON: {e}") from e
+                raise service.ServiceError(f"facts_patch is not valid JSON: {e.msg}") from e
             if not isinstance(parsed, dict):
                 raise service.ServiceError("facts_patch must be a JSON object, for example {\"filing_status\": \"mfj\"}.")
             patch.update(parsed)
         if filing_status.strip():
             patch["filing_status"] = filing_status.strip()
-        resolution = {"action": action, "resolved_by": resolved_by.strip() or "kushim-employee", "note": note.strip()}
+        resolution: dict[str, Any] = {"action": action, "note": note.strip()}
         if patch:
             resolution["facts_patch"] = patch
-        await run_in_threadpool(service.resolve, rid, resolution)
+        await run_in_threadpool(lambda: service.resolve(rid, resolution, actor=me, interrupt_id=interrupt_id or ""))
         return RedirectResponse(f"/returns/{rid}", status_code=303)
 
     @app.post("/returns/{rid}/run")
-    async def run_again(rid: str):
-        await run_in_threadpool(service.run, rid)
+    async def run_again(request: Request, rid: str):
+        me = require_staff(request, "advance_return")
+        check_return_id(rid)
+        await verify_csrf(request, me)
+        await run_in_threadpool(service.run, rid, me)
         return RedirectResponse(f"/returns/{rid}", status_code=303)
 
-    # ------------------------------------------------------------ outputs
+    @app.post("/returns/{rid}/access-code")
+    async def new_access_code(request: Request, rid: str):
+        me = require_staff(request, "create_return")
+        check_return_id(rid)
+        await verify_csrf(request, me)
+        if not service.index_row(rid):
+            raise KeyError(rid)
+        code = auth.issue_access_code(rid)
+        audit.record("access_code_issued", actor=me.label, return_id=rid, reissued=True)
+        return page(request, "created.html", rid=rid, code=code, fixture=(service.index_row(rid) or {}).get("fixture"), reissued=True, anon_csrf=request.state.anon_csrf)
+
+    @app.post("/returns/{rid}/delete")
+    async def delete(request: Request, rid: str):
+        me = require_staff(request, "delete_return")
+        check_return_id(rid)
+        await verify_csrf(request, me)
+        await run_in_threadpool(lambda: service.delete_return(rid, actor=me))
+        return RedirectResponse("/", status_code=303)
+
+    # ------------------------------------------------------------ staff: outputs
     @app.get("/returns/{rid}/form", response_class=HTMLResponse)
-    async def form_html(rid: str):
+    async def form_html(request: Request, rid: str):
+        require_staff(request, "view_draft")
+        check_return_id(rid)
         state = await run_in_threadpool(service.get_state, rid)
-        return HTMLResponse(render_html(state, dashboard_url=f"/returns/{rid}"))
+        return HTMLResponse(render_html(state, dashboard_url=f"/returns/{rid}", csp_nonce=request.state.csp_nonce))
 
     @app.get("/returns/{rid}/form.pdf")
-    async def form_pdf(rid: str):
+    async def form_pdf(request: Request, rid: str):
+        require_staff(request, "view_draft")
+        check_return_id(rid)
         state = await run_in_threadpool(service.get_state, rid)
         pdf = await run_in_threadpool(render_pdf, state)
         return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="1040sr-draft-{rid}.pdf"'})
 
     @app.get("/returns/{rid}/state.json")
-    async def state_json(rid: str):
+    async def state_json(request: Request, rid: str):
+        require_staff(request, "view_draft")
+        check_return_id(rid)
         return JSONResponse(await run_in_threadpool(service.state_json, rid))
 
     @app.get("/returns/{rid}/pending.json")
-    async def pending_json(rid: str):
+    async def pending_json(request: Request, rid: str):
+        require_staff(request, "view_return")
+        check_return_id(rid)
         return JSONResponse({"return_id": rid, "status": service.get_state(rid).get("status"), "pending": service.pending(rid)})
+
+    @app.get("/audit", response_class=HTMLResponse)
+    async def audit_page(request: Request):
+        require_staff(request, "view_audit")
+        intact, bad, n = await run_in_threadpool(audit.verify_chain)
+        return page(request, "audit.html", events=audit.recent(300), intact=intact, bad=bad, n=n)
+
+    # ------------------------------------------------------------ taxpayers
+    @app.get("/start", response_class=HTMLResponse)
+    async def start_page(request: Request):
+        if web.taxpayer(request):
+            return RedirectResponse("/t", status_code=303)
+        return page(request, "start.html")
+
+    @app.post("/start")
+    async def start(request: Request):
+        await verify_csrf(request)
+        ratelimit.START.hit(web.client_ip(request))
+        rid = service.new_return_id()
+        public = auth.system("taxpayer-start")
+        await run_in_threadpool(lambda: service.create_return([], None, None, return_id=rid, actor=public))
+        await run_in_threadpool(service.run, rid, public)
+        code = auth.issue_access_code(rid)
+        token, me = auth.start_session(auth.taxpayer_principal(rid))
+        audit.record("taxpayer_session_started", actor=me.label, return_id=rid, how="new return", ip=web.client_ip(request))
+        request.state.principal = me
+        response = page(request, "taxpayer_code.html", code=code)
+        web.set_cookie(response, request, web.TAXPAYER_COOKIE, token, auth.TAXPAYER_MAX_SECONDS)
+        return response
+
+    @app.post("/resume")
+    async def resume(request: Request, code: str = Form("")):
+        await verify_csrf(request)
+        ratelimit.CODE_REDEEM.hit(web.client_ip(request))
+        rid = auth.redeem_access_code(code)
+        if rid is None or not service.index_row(rid):
+            audit.record("taxpayer_resume_failed", ip=web.client_ip(request))
+            return page(request, "start.html", status_code=401, error="That code does not open a return. Check it and try again, or ask Kushim for a new one.")
+        auth.end_session(request.cookies.get(web.TAXPAYER_COOKIE))
+        token, me = auth.start_session(auth.taxpayer_principal(rid))
+        audit.record("taxpayer_session_started", actor=me.label, return_id=rid, how="access code", ip=web.client_ip(request))
+        response = RedirectResponse("/t", status_code=303)
+        web.set_cookie(response, request, web.TAXPAYER_COOKIE, token, auth.TAXPAYER_MAX_SECONDS)
+        return response
+
+    @app.get("/t", response_class=HTMLResponse)
+    async def taxpayer_home(request: Request):
+        me = require_taxpayer(request)
+        rid = me.subject
+        state = await run_in_threadpool(service.get_state, rid)
+        pend = service.pending(rid)
+        return page(request, "taxpayer.html", state=state, pending=pend if pend and pend.get("type") in ("question", "upload") else None,
+                    pending_id=service.pending_id(rid), waiting_on_kushim=bool(pend and pend.get("type") == "escalation") or state.get("status") == "waiting_human",
+                    transcript=service.transcript_from_state(state), auto_refresh=state.get("status") in BUSY_STATUSES or state.get("status") == "new",
+                    has_fixture=bool((service.index_row(rid) or {}).get("fixture")), accept=uploads.ACCEPT, max_mb=uploads.max_bytes() // (1024 * 1024))
+
+    @app.post("/t/answer")
+    async def taxpayer_answer(request: Request, text: str = Form(""), interrupt_id: str = Form("")):
+        me = require_taxpayer(request)
+        await verify_csrf(request, me)
+        ratelimit.ANSWER.hit(me.subject)
+        rid = me.subject
+        pend = service.pending(rid)
+        docs: list[dict[str, Any]] = []
+        if pend and pend.get("type") == "upload":
+            row = service.index_row(rid) or {}
+            if row.get("fixture"):
+                docs = _not_yet_attached(rid, service.fixture_documents(row["fixture"]))
+            text = text.strip() or "done"
+        await run_in_threadpool(lambda: service.answer(rid, text, docs or None, actor=me, interrupt_id=interrupt_id or ""))
+        return RedirectResponse("/t", status_code=303)
+
+    @app.post("/t/upload")
+    async def taxpayer_upload(request: Request):
+        me = require_taxpayer(request)
+        await verify_csrf(request, me)
+        ratelimit.ANSWER.hit(me.subject)
+        rid = me.subject
+        form = await request.form()
+        pend = service.pending(rid)
+        if not pend or pend.get("type") != "upload":
+            raise service.ServiceError("The conversation is not at the upload step; answer the current question first.")
+        files = [f for f in form.getlist("files") if isinstance(f, UploadFile) and f.filename]
+        if len(files) > uploads.MAX_FILES:
+            raise service.ServiceError(f"At most {uploads.MAX_FILES} files at a time.")
+        docs = [service.save_upload(rid, f.filename, await f.read(uploads.max_bytes() + 1), actor=me) for f in files]
+        if form.get("use_fixture"):
+            row = service.index_row(rid) or {}
+            if row.get("fixture"):
+                docs.extend(_not_yet_attached(rid, service.fixture_documents(row["fixture"])))
+        text = str(form.get("text") or "").strip() or "done"
+        await run_in_threadpool(lambda: service.answer(rid, text, docs, actor=me, interrupt_id=str(form.get("interrupt_id") or "")))
+        return RedirectResponse("/t", status_code=303)
+
+    @app.post("/t/leave")
+    async def taxpayer_leave(request: Request):
+        me = web.taxpayer(request)
+        await verify_csrf(request, me)
+        auth.end_session(request.cookies.get(web.TAXPAYER_COOKIE))
+        response = RedirectResponse("/start", status_code=303)
+        web.clear_cookie(response, web.TAXPAYER_COOKIE)
+        return response
 
     return app
 
