@@ -28,6 +28,7 @@ Other entry points:
 | `python run.py graph` | Prints the Mermaid diagram of the compiled graph and writes `docs/graph.mmd` |
 | `pytest -q` | The test suite (offline; tax math runs in-process); `pytest -q tests/security` for the security tests alone |
 | `python run.py staff add NAME --role clerk\|preparer\|admin` | Create a staff account (`staff list`, `staff passwd NAME` too) |
+| `python run.py try` | One step to click through it locally: demo staff accounts (ada admin, pat preparer, cleo clerk; password `silverfile-demo-2025`), demo returns, server and browser |
 | `python run.py purge [--days N]` | Delete abandoned returns past retention (also runs at start-up) |
 | `python run.py audit` | Verify the security log's hash chain and print recent events |
 | `python evals/run_evals.py` | The eval cases with expected line values and expected escalations |

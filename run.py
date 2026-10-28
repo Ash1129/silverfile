@@ -11,6 +11,7 @@
   python run.py staff list | passwd NAME   list accounts, or set a new password (ends that person's sessions)
   python run.py purge [--days N]           delete abandoned returns (unfinished, idle N days; default SILVERFILE_RETENTION_DAYS)
   python run.py audit                      verify the security log's hash chain and print the latest events
+  python run.py try                        one step to try it out locally: demo staff accounts, demo returns, server, browser
 """
 from __future__ import annotations
 
@@ -204,6 +205,36 @@ def cmd_audit(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+DEMO_PASSWORD = "silverfile-demo-2025"  # local try-out accounts only; the data directory is gitignored
+
+
+def cmd_try(args: argparse.Namespace) -> int:
+    """Everything needed to click through the app (and try to break it) in one command."""
+    import os
+    import threading
+    import webbrowser
+
+    from silverfile.security import auth
+
+    if os.environ.get("SILVERFILE_ENV", "").lower() == "production":
+        print("refusing to create demo accounts with a shared password in production")
+        return 1
+    for user, role in (("ada", "admin"), ("pat", "preparer"), ("cleo", "clerk")):
+        try:
+            auth.create_staff(user, DEMO_PASSWORD, role)
+        except ValueError:
+            pass  # already there
+    os.environ["SILVERFILE_SEED_DEMO"] = "1"
+    url = f"http://localhost:{args.port}"
+    print(f"\nSilverFile at {url}  (Ctrl+C to stop)")
+    print(f"Staff logins, password {DEMO_PASSWORD}: ada (admin), pat (preparer), cleo (clerk)")
+    print(f"Taxpayer: log in as pat, start a return, then open {url}/start in a private window with the access code\n")
+    if not args.no_browser:
+        threading.Timer(2.0, lambda: webbrowser.open(url)).start()
+    args.host = "127.0.0.1"
+    return cmd_serve(args)
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -225,6 +256,7 @@ def main() -> int:
     s = sub.add_parser("graph"); s.set_defaults(fn=cmd_graph)
     s = sub.add_parser("staff"); s.add_argument("action", choices=["add", "list", "passwd"]); s.add_argument("name", nargs="?"); s.add_argument("--role", default="preparer", choices=["clerk", "preparer", "admin"]); s.set_defaults(fn=cmd_staff)
     s = sub.add_parser("purge"); s.add_argument("--days", type=int); s.add_argument("--include-finished", action="store_true"); s.set_defaults(fn=cmd_purge)
+    s = sub.add_parser("try"); s.add_argument("--port", type=int, default=8000); s.add_argument("--no-browser", action="store_true"); s.set_defaults(fn=cmd_try)
     s = sub.add_parser("audit"); s.add_argument("--last", type=int, default=20); s.set_defaults(fn=cmd_audit)
     args = ap.parse_args()
     return args.fn(args)
