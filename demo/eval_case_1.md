@@ -12,7 +12,42 @@ Terminal (prefilled intake, about 30 seconds online, 2 seconds offline):
 python run.py demo case1_clean
 ```
 
-Dashboard: `python run.py serve`, open http://localhost:8000, click **New return**, pick fixture `case1_clean`, then watch the return move through the agents on the return page. Or hold the conversation yourself with `python run.py chat --case case1_clean` and type the answers in `data/fixtures/case1_clean/answers.json` (or your own words; the parser copes with drift).
+Dashboard: `python run.py try` creates demo staff accounts (log in as `ada`, password `silverfile-demo-2025`), seeds demo returns and opens the browser. Click **New return**, pick fixture `case1_clean`, then watch the return move through the agents on the return page. Or hold the conversation yourself, below.
+
+## Hold the conversation yourself (the clean run, one question at a time)
+
+```bash
+python run.py chat
+```
+
+Type the answers in the right-hand column. They are the ones in `data/fixtures/case1_clean/answers.json`, and your own words work too. At the upload step, type `case1_clean` to attach the demonstration documents (the W-2 image and the three 1099s). The questions below are shortened; SilverFile asks each one in full, and adds a one-line explanation the first time a tax term appears.
+
+| # | SilverFile asks | You type |
+| ---: | --- | --- |
+| 1 | Am I speaking with the person whose tax return this is? | `Yes, it's my return` |
+| 2 | What is your full name, as it appears on your Social Security card? | `Eleanor Whitfield` |
+| 3 | What Social Security number should go on the return? (test numbers 900 to 999 only) | `912-34-5678` |
+| 4 | What is your date of birth? | `March 14, 1954` |
+| 5 | Are you legally blind? (explains *legally blind* and *standard deduction*) | `No` |
+| 6 | At the end of 2025, were you single, married, widowed, or divorced? | `Single` |
+| 7 | Which filing status do you expect to use? (explains *filing status*) | `Single` |
+| 8 | Who is the first dependent you'll list on this return? (explains *dependent*) | `None` |
+| 9 | Can someone else claim you as a dependent on their own tax return? | `No` |
+| 10 | Which tax forms did you receive for 2025? | `I have a W-2 from the library, my SSA-1099, a 1099-R from my pension, and a 1099-INT from the bank` |
+| 11 | Did you have any other income in 2025 that isn't on one of those forms? | `No` |
+| 12 | In total, how much did you send the IRS in estimated tax payments during 2025? | `500` |
+| 13 | What is the total of any adjustments to income you have to report? | `None` |
+| 14 | Did a preparer give you an amount for 'additional income' on Schedule 1? | `None` |
+| 15 | …for additional taxes on Schedule 2? | `None` |
+| 16 | …for credits on Schedule 3? | `None` |
+| 17 | If you're due a refund, where should it go? | `My checking account at Finger Lakes Savings` |
+| 18 | Is that account in your own name? | `Yes` |
+| 19 | Last step: please upload your tax forms now. | `case1_clean` |
+| 20 | Here's what I have… Is that all correct? | `Yes` |
+
+Twenty questions, no pauses for a person, and the draft below. The automated version of exactly this conversation is `test_plain_case1_conversation_matches_the_prefilled_numbers` in `tests/test_intake.py`.
+
+To see the dignity rules at work on the same case, swap in the awkward answers from the demo script at the end of `docs/INTAKE_DIGNITY.md`. Examples: a real-looking SSN at question 3, or "Actually, can we go back to my date of birth?" at question 11. The draft comes out the same. An advice question at question 7 also pauses the return for a Kushim employee: type `{"action":"continue"}` at the prompt, answer `Single`, and the run finishes as before.
 
 ## What you should see
 

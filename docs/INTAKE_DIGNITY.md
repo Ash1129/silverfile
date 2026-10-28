@@ -82,12 +82,13 @@ Built by Daniel (agent memory) and Ashwin: every answer is a checkpoint, so noth
 
 ## What to show in the demo video (the brief requires these working live)
 
-Run `python run.py chat` and type, in order:
+Run `python run.py chat` and follow the case 1 answers in `demo/eval_case_1.md`, with these moments swapped in, in this order:
 
-1. At the SSN question: `123-45-6789`. It is refused, not kept, and asked again. Then type `912-34-5678`.
-2. At the filing-status question: `Would it help to file separately?`. It is declined kindly, noted for the preparer, and the same question is asked again. Then type `Single`.
-3. Note the one-line explanation of "filing status" and "standard deduction" the first time each appears.
-4. At the "other income" question: `Actually, can we go back to my date of birth?`. Only the date is re-asked.
-5. At the "someone else claim you" question: `No. Here's my social, 123-45-6789`. "No" counts, and the number is not kept, and the person is told.
-6. Type `quit`, then resume with `python run.py chat --resume <id>` to show that every answer was kept. On the web, use "Save and leave" and come back with the access code, and the conversation so far is still there.
-7. Optional: start again and answer the first question `I'm her daughter, I'm typing this for her` to show the exploitation stop.
+1. **Question 3 (SSN):** type `123-45-6789`. It is refused, not kept, and asked again. Then type `912-34-5678`.
+2. **Question 5 (legally blind):** point out the one-line explanations of "legally blind" and "standard deduction". At question 7, "filing status" gets one too, and none is ever repeated.
+3. **Question 7 (filing status):** type `Would it help to file separately?`. It is declined kindly and noted for the preparer, and the return pauses for a Kushim employee. Type `{"action":"continue"}` at the prompt, and the same question is asked again. Then type `Single`.
+4. **Question 9 (someone else claim you):** type `No. Here's my social, 123-45-6789`. "No" counts, the number is not kept, and the person is told.
+5. **Question 11 (other income):** type `Actually, can we go back to my date of birth?`. Only the date is re-asked. Type `March 14, 1954`, then `No` to the other-income question.
+6. **Any later question:** type `quit`, then `python run.py chat --resume <id>` (the id is printed at the top). Every answer was kept, and the conversation carries on. On the web, use "Save and leave" and come back with the access code, and the conversation so far is still there.
+7. **Upload step:** type `case1_clean`, then `Yes` at the summary, and the draft is produced.
+8. **Optional, a new chat:** answer the first question with `I'm her daughter, I'm typing this for her` to show the exploitation stop.
