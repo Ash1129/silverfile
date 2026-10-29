@@ -93,3 +93,22 @@ Docker is included, hardened (unprivileged user, read-only filesystem, no baked-
 ## 10. AI disclosure
 
 Three Claude models run inside the product, none of which produces a number that reaches a line; the full table is in `docs/AI_DISCLOSURE.md`. The design stage used Blueprint. The code, tests, fixtures and documents were written with Claude Code from the brief, with the author directing the work, settling the architecture questions, reviewing the runs and deciding what to keep. No real taxpayer data was used.
+
+
+## 11. Team roles
+
+Seven people shared six focus areas, with Guardrails and ethics split in two. The table below is the assignment from the team plan; the commit history on GitHub is the record of who built what, and each person's design note or section is where their reasoning is written down.
+
+| Focus area | Person | What they owned | Where to look |
+| --- | --- | --- | --- |
+| Agent memory | Daniel | Saving and resuming a session with a summary of what was covered, and the context-window strategy measured with and without it | `src/silverfile/memory.py`, `docs/metrics.md`, `python run.py batch --no-context-strategy` |
+| Inter-agent communication | Ishaan | The shared state, the typed message bus, the channel policy and per-agent write contracts, and the reducer for the parallel branch | `src/silverfile/comms/`, `docs/INTER_AGENT_COMMUNICATION.md`, `tests/test_comms.py` |
+| Task division and management | Mahika | The Orchestrator: conditional routing, the parallel extraction branch, the capped review loop, the loop guard and the graph diagram | `docs/ORCHESTRATION.md`, `docs/graph.png`, `tests/test_routing_table.py`, `tests/test_orchestration_flow.py` |
+| MLOps/DevOps | Ash | The repository and setup, the first working graph, deployment, evaluations and metrics, and the Docker container | `Dockerfile`, `render.yaml`, `evals/`, `docs/metrics.md` |
+| Guardrails and ethics (escalation) | Tony | What makes the system stop and call a person: the escalation triggers, the human-review pause and the checks on Continue and Accept | `src/silverfile/agents/escalation.py`, `tests/test_escalations.py`, `tests/security/test_sec_hitl.py` |
+| Guardrails and ethics (dignity) | Gabriel | How the intake treats the person: one question at a time, plain language, honest uncertainty and volunteered SSNs | `docs/INTAKE_DIGNITY.md`, `tests/test_intake_dignity.py`, `demo/eval_case_1.md` |
+| Security | Sasha | Staff login and roles, the real-SSN check, encryption at rest, defenses against hidden text in uploads, and safe API-key handling | `docs/THREAT_MODEL.md`, `src/silverfile/security/`, `tests/security/` |
+
+**How the roles fit together.** Four pairs had to agree directly: Guardrails A and B shared one escalation trigger list (A detects, B words the message to the person); Guardrails B and Security settled who owns the SSN check; Task division and Inter-agent communication kept the graph and the state matching, so a route and what travels along it agree; and Task division and Guardrails A fixed where the human-review pause can happen. The Orchestrator's table has one row for each of those agreements, and `tests/test_routing_table.py` checks each row.
+
+**Task division and management (Mahika Arora).** The Orchestrator decides which agent acts next from the state alone, through one ordered table (`decide_next`), and owns when a return ends. Mahika wrote the tests for that table, row by row, and the tests that run whole returns through the graph and check the order the agents run in. After the human-review change landed she brought the tests and the diagram back in step with it and wrote the design note `docs/ORCHESTRATION.md`, which also records one known gap: a Review finding aimed at Intake is routed to Computation, not back to Intake as section 3 says. She also added the header API-key control, which keeps a visitor's key in server memory for the browser session only and never saves it. Her personal AI disclosure is in `docs/AI_DISCLOSURE.md`.
