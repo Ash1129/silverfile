@@ -117,11 +117,14 @@ def install_log_redaction() -> None:
 
     def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
         record = base(*args, **kwargs)
-        try:
-            msg = record.getMessage()
-        except Exception:  # a malformed record is still logged, just unformatted
-            msg = str(record.msg)
-        record.msg, record.args = redact(msg), ()
+        # redact the template and each argument in place, keeping their number and types:
+        # formatters such as uvicorn's access log unpack record.args themselves
+        if isinstance(record.msg, str):
+            record.msg = redact(record.msg)
+        if isinstance(record.args, tuple):
+            record.args = tuple(redact(a) if isinstance(a, str) else a for a in record.args)
+        elif isinstance(record.args, dict):
+            record.args = {k: (redact(v) if isinstance(v, str) else v) for k, v in record.args.items()}
         if record.exc_text:
             record.exc_text = redact(record.exc_text)
         return record

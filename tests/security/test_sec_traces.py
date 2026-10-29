@@ -21,8 +21,11 @@ from conftest import ROOT
 from silverfile import seed, service
 from silverfile.security import audit, auth, pii
 
-TRACE_DIRS = ("traces", "docs")  # outputs: no full SSN at all, test series or not
-INPUT_DIRS = ("demo", "evals", "data")  # scripted inputs: a taxpayer types a test SSN, never anything else
+TRACE_DIRS = ("traces",)  # outputs: no full SSN at all, test series or not
+INPUT_DIRS = ("demo", "evals", "data", "docs")  # scripts and walkthroughs: what a person types in a demo
+# Public demonstration numbers a walkthrough may tell someone to type to show the rejection
+# (123-45-6789 is the classic example; 078-05-1120 the voided Woolworth card). Never a real person's.
+DEMO_REJECTION_EXAMPLES = {"123-45-6789", "078-05-1120"}
 TEXT_SUFFIXES = {".json", ".log", ".md", ".html", ".txt", ".csv", ".mmd", ".jsonl"}
 
 
@@ -40,8 +43,10 @@ def test_committed_traces_and_docs_hold_no_full_ssn():
 
 def test_committed_inputs_hold_only_test_ssns():
     files = _tracked(*INPUT_DIRS)
-    real = {str(f.relative_to(ROOT)): [s for s in pii.find_ssns(f.read_text(errors="ignore")) if not pii.is_test_ssn(s)][:3] for f in files}
+    real = {str(f.relative_to(ROOT)): [s for s in pii.find_ssns(f.read_text(errors="ignore")) if not pii.is_test_ssn(s) and s not in DEMO_REJECTION_EXAMPLES][:3] for f in files}
     assert {k: v for k, v in real.items() if v} == {}
+    # and the demonstration numbers are ones the system refuses
+    assert not any(pii.validate_test_ssn(s)[0] for s in DEMO_REJECTION_EXAMPLES)
 
 
 @pytest.fixture

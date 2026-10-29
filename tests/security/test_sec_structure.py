@@ -23,7 +23,8 @@ from silverfile.state import ReturnStatus
 SRC = ROOT / "src" / "silverfile"
 NETWORK = {"socket", "ssl", "smtplib", "ftplib", "telnetlib", "poplib", "imaplib", "xmlrpc", "requests", "urllib3", "aiohttp", "httpx", "http", "urllib", "websocket", "websockets", "paramiko", "subprocess", "asyncssh"}
 PARSING_ONLY = {"urllib.parse", "http.cookies", "http"}  # string parsing and status codes; no connection
-NETWORK_ALLOWED = {("anthropic", "llm.py"), ("anthropic", "gate.py"), ("mcp", "client.py"), ("mcp", "server.py")}
+NETWORK_ALLOWED = {("anthropic", "llm.py"), ("anthropic", "gate.py"), ("mcp", "client.py"), ("mcp", "server.py"),
+                   ("subprocess", "keysetup.py")}  # one local `git check-ignore .env` during setup; no network
 FILING_WORDS = re.compile(r"\b(e-?file|efile|submit_return|file_return|transmit|irs\.gov|modernized e-file|mef_|send_to_irs)\b", re.I)
 
 
@@ -49,7 +50,7 @@ def test_no_module_opens_a_network_connection_of_its_own():
             top = mod.lstrip(".").split(".")[0]
             if mod in PARSING_ONLY:
                 continue
-            if top in NETWORK or top in ("anthropic", "mcp") and (top, path.name) not in NETWORK_ALLOWED:
+            if (top in NETWORK or top in ("anthropic", "mcp")) and (top, path.name) not in NETWORK_ALLOWED:
                 offenders.append(f"{path.relative_to(SRC)} imports {mod}")
     assert offenders == []
 
