@@ -85,6 +85,8 @@ Why a hub and not a pipeline: the brief's control flow is full of "if this, go b
 
 `detect_loop` in `agents/orchestrator.py` has two detectors: an absolute ceiling (`MAX_HANDOFFS = 40` handoffs among the working agents) and a repeated short pattern (a 2- or 3-agent cycle repeated `LOOP_PATTERN_REPEATS = 3` times without reaching review). When it fires the Orchestrator writes a `loop_guard` escalation, the return pauses for a person, and whatever the person decides, the handoff log is marked `reset` so the guard judges only what happens afterwards. `tests/test_loop_guard.py` turns on a fault-injection flag that makes Eligibility and Computation hand the return back and forth, and asserts the guard trips, the reason names the pattern, and the return reaches a person rather than spinning.
 
+The routing table row by row (with the test that covers each row), the entry points, the review bound, the human-review path and the known gaps are in [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md).
+
 ## Inter-agent communication
 
 Agents talk through a typed **message bus** (`mailbox` in graph state, `src/silverfile/comms/`) rather than loose state fields. Every handoff is a `request` from the Orchestrator, and every result is an `inform` reply on the same thread. Review's findings become `revise` **work orders** addressed to the agent that owns each fix, and that agent replies `done`. Escalations appear as `escalate`, and a person's decision as `resolve`. Three things hold this together:
@@ -154,3 +156,17 @@ evals/                cases.json + run_evals.py
 tests/                pytest suite; tests/security/ the security tests
 traces/               sample runs (events, provenance, token log)
 ```
+
+## Team and roles
+
+Seven people, one focus area each. Each role has a design note or section in `docs/`, and the commit history shows who built what.
+
+| Person | Role | Where to look |
+| --- | --- | --- |
+| Ashwin (Ash) | MLOps / DevOps: the first working graph, deployment, evals and metrics | `src/silverfile/`, `Dockerfile`, `render.yaml`, `docs/metrics.md` |
+| Sasha | Security | `docs/THREAT_MODEL.md`, `src/silverfile/security/`, `src/silverfile/keysetup.py`, `tests/security/` |
+| Ishaan | Inter-agent communication | `src/silverfile/comms/`, `docs/INTER_AGENT_COMMUNICATION.md`, `tests/test_comms.py` |
+| Daniel | Agent memory | `src/silverfile/memory.py`, context handling and the `--no-context-strategy` measurement |
+| Tony (Guardrails A) | Guardrails and ethics: escalations and human review | `src/silverfile/agents/escalation.py`, `tests/test_escalations.py`, `tests/security/test_sec_hitl.py` |
+| Gabriel (Guardrails B) | Guardrails and ethics: intake dignity | `docs/INTAKE_DIGNITY.md`, `tests/test_intake_dignity.py`, `demo/eval_case_1.md` |
+| Mahika | Task division and management: the Orchestrator, routing, parallel branch, review bound, loop guard, graph diagram | `docs/ORCHESTRATION.md`, `docs/graph.mmd`, `tests/test_routing_table.py`, `tests/test_orchestration_flow.py` |
