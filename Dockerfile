@@ -3,7 +3,7 @@
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    SILVERFILE_ENV=production SILVERFILE_DATA_DIR=/data SILVERFILE_SEED_DEMO=1 SILVERFILE_REQUIRE_KEY=1
+    SILVERFILE_ENV=production SILVERFILE_DATA_DIR=/data SILVERFILE_SEED_DEMO=1
 
 RUN groupadd --system --gid 10001 silverfile \
  && useradd --system --uid 10001 --gid silverfile --home-dir /nonexistent --no-create-home --shell /usr/sbin/nologin silverfile

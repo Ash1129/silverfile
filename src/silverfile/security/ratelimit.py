@@ -60,10 +60,11 @@ CODE_REDEEM = SlidingWindow(10, 15 * 60)  # access-code guesses per client addre
 START = SlidingWindow(20, 60 * 60)  # new taxpayer returns per client address
 ANSWER = SlidingWindow(30, 60)  # answers and uploads per taxpayer session
 STAFF_WRITE = SlidingWindow(120, 60)  # staff actions per staff session
+KEY_CHECK = SlidingWindow(10, 15 * 60)  # API-key submissions per client address (each one is an outbound call to Anthropic)
 
 
 def reset_all() -> None:
-    for w in (LOGIN, CODE_REDEEM, START, ANSWER, STAFF_WRITE):
+    for w in (LOGIN, CODE_REDEEM, START, ANSWER, STAFF_WRITE, KEY_CHECK):
         w.reset()
     _calls.reset()
     _global_calls.reset()

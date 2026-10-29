@@ -27,7 +27,7 @@ Everything sits in one data directory (`SILVERFILE_DATA_DIR`). The directory is 
 | `returns.sqlite` | The list index: status, flags, taxpayer name, one-line summary | Name and summary are encrypted. No SSN is ever written here. | Same as the return |
 | `auth.sqlite` | Staff accounts, sessions, taxpayer access codes | scrypt password hashes. Sessions and codes are stored only as keyed hashes (HMAC-SHA256). | Sessions expire after 30 min idle / 12 h for staff and 60 min / 24 h for taxpayers. Codes are deleted with the return. |
 | `security.sqlite` | Security event log, model spend per return | Append-only HMAC hash chain. Details are redacted (no SSNs, no keys). | Kept |
-| Process memory | Visitor API keys on a shared copy (`gate.py`) | Never written to disk or logs; 12 h sliding expiry | Session |
+| Process memory | Visitor API keys entered in the header control or the optional gate (`gate.py`) | Never written to disk or logs; 12 h sliding expiry | Session |
 | `.env` (local) / host secret store | API key, data key, first admin password | Gitignored and dockerignored. A warning is printed if the file is readable by others. Production refuses to start without the data key. | n/a |
 
 One key, `SILVERFILE_DATA_KEY`, is turned into two keys with HKDF: an encryption key and an integrity (HMAC) key. To rotate it, put the new key first in a comma-separated list. A development checkout without the variable generates a key into the data directory. That is convenient but protects nothing, because the key then sits next to the data, so `SILVERFILE_ENV=production` (set in the Dockerfile) turns that fallback off.
