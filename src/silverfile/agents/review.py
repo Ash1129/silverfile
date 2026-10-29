@@ -167,8 +167,12 @@ def claude_checks(state: ReturnState) -> tuple[list[Finding], int, int, str]:
 
 def run_review(state: ReturnState) -> dict[str, Any]:
     rnd = int(state.get("review_round", 0)) + 1
-    findings, recomputed = rule_checks(state)
-    model_findings, tin, tout, method = claude_checks(state) if not findings else ([], 0, 0, "rules")
+    checked_state = state
+    if state.get("recompute_stage") == "review":
+        current = (state.get("resolution_request") or {}).get("escalation_id")
+        checked_state = {**state, "escalations": [e for e in state.get("escalations", []) if e.get("id") != current]}
+    findings, recomputed = rule_checks(checked_state)
+    model_findings, tin, tout, method = claude_checks(checked_state) if not findings else ([], 0, 0, "rules")
     # model findings that only restate "low" concerns do not fail a return; high/medium do
     all_findings = [*findings, *[f for f in model_findings if f.get("severity") in ("high", "medium")]]
     low = [f for f in model_findings if f.get("severity") == "low"]

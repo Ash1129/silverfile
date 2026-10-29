@@ -33,7 +33,8 @@ from .. import seed, service
 from ..comms.bus import digest
 from ..forms.render import jinja_env, mask_ssn_deep, render_html, render_pdf, status_label
 from ..memory import session_summary
-from ..security import audit, auth, integrity, ratelimit, retention, uploads
+from ..agents.escalation import accept_requirements
+from ..security import audit, auth, integrity, pii, ratelimit, retention, uploads
 from ..security.pii import install_log_redaction
 from . import gate, web
 from .web import CSRFFailed, LoginRequired, check_return_id, require_staff, require_taxpayer, verify_csrf
@@ -75,7 +76,16 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
     def error(request: Request, status_code: int, title: str, message: str, back: str = "/") -> HTMLResponse:
-        return page(request, "error.html", status_code=status_code, title=title, message=message, back=web.safe_next(back))
+        back = web.safe_next(back)
+        return page(request, "error.html", status_code=status_code, title=title, message=message, back=back,
+                    back_label="Back to this return" if back.startswith("/returns/") else "Go back")
+
+    def error_back(request: Request) -> str:
+        """Use the known return id; privacy headers intentionally suppress Referer."""
+        rid = request.path_params.get("rid")
+        if isinstance(rid, str) and web.RETURN_ID_RE.fullmatch(rid):
+            return f"/returns/{rid}"
+        return web.safe_next(request.headers.get("referer"))
 
     # ------------------------------------------------------------ middleware (the last added runs first)
     app.add_middleware(gate.KeyGate, render_gate=lambda request: page(request, "key.html"))
@@ -96,12 +106,12 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(CSRFFailed)
     async def _csrf(request: Request, exc: CSRFFailed):
-        return error(request, 403, "The form expired", "That form could not be verified (it may have been open too long, or sent from another site). Reload the page and try again.", request.headers.get("referer") or "/")
+        return error(request, 403, "The form expired", "That form could not be verified (it may have been open too long, or sent from another site). Reload the page and try again.", error_back(request))
 
     @app.exception_handler(ratelimit.RateLimited)
     async def _limited(request: Request, exc: ratelimit.RateLimited):
         audit.record("rate_limited", path=request.url.path, ip=web.client_ip(request))
-        r = error(request, 429, "Too many attempts", f"Please wait {exc.retry_after} seconds and try again.")
+        r = error(request, 429, "Too many attempts", f"Please wait {exc.retry_after} seconds and try again.", error_back(request))
         r.headers["Retry-After"] = str(exc.retry_after)
         return r
 
@@ -118,7 +128,7 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(service.ServiceError)
     async def _bad_request(request: Request, exc: service.ServiceError):
-        return error(request, 409 if isinstance(exc, service.Stale) else 400, "That did not fit the return's current state", str(exc), request.headers.get("referer") or "/")
+        return error(request, 409 if isinstance(exc, service.Stale) else 400, "That did not fit the return's current state", str(exc), error_back(request))
 
     @app.exception_handler(KeyError)
     async def _not_found(request: Request, exc: KeyError):
@@ -236,8 +246,7 @@ def create_app() -> FastAPI:
             audit.record("access_code_issued", actor=me.label, return_id=rid)
         return page(request, "created.html", rid=rid, code=code, fixture=fixture, anon_csrf=request.state.anon_csrf)
 
-    @app.get("/returns/{rid}", response_class=HTMLResponse)
-    async def show_return(request: Request, rid: str):
+    async def render_return(request: Request, rid: str, *, status_code: int = 200, form_values: dict[str, str] | None = None, facts_patch_error: str | None = None):
         me = require_staff(request, "view_return")
         check_return_id(rid)
         state = await run_in_threadpool(service.get_state, rid)
@@ -245,36 +254,64 @@ def create_app() -> FastAPI:
         row = service.index_row(rid) or {}
         open_esc = [e for e in state.get("escalations", []) if e.get("status") == "open"]
         return page(
-            request, "return.html", rid=rid, state=state, pending=pend, pending_id=service.pending_id(rid), row=row, fixture=row.get("fixture"),
+            request, "return.html", status_code=status_code, rid=rid, state=state, pending=pend, pending_id=service.pending_id(rid), row=row, fixture=row.get("fixture"),
             transcript=service.transcript_from_state(state), summary=session_summary(state), open_escalations=open_esc,
             escalation=(pend.get("escalation") if pend and pend.get("type") == "escalation" else (open_esc[0] if open_esc else None)),
             documents_in=state.get("documents_in") or [], filing_statuses=FILING_STATUSES,
-            auto_refresh=state.get("status") in BUSY_STATUSES, busy=BUSY_STATUSES, status_text=status_label(state.get("status")),
+            auto_refresh=state.get("status") in BUSY_STATUSES and not facts_patch_error, busy=BUSY_STATUSES, status_text=status_label(state.get("status")),
             hop_chain=_compress_hops(state.get("handoffs") or []), seal=integrity.verify(state), bus=digest(state),
             security_events=audit.recent(20, return_id=rid) if me.can("view_audit") else [],
+            accept_requirements=accept_requirements(state), form_values=form_values or {}, facts_patch_error=facts_patch_error,
         )
 
+    @app.get("/returns/{rid}", response_class=HTMLResponse)
+    async def show_return(request: Request, rid: str):
+        return await render_return(request, rid)
+
+    @app.get("/returns/{rid}/hitl.json")
+    async def human_workflow(request: Request, rid: str):
+        require_staff(request, "view_return")
+        check_return_id(rid)
+        state = await run_in_threadpool(service.get_state, rid)
+        return JSONResponse(pii.redact_deep({"blocking_review": state.get("blocking_review"), "human_edit": state.get("human_edit"),
+                                           "required_actions": accept_requirements(state), "recompute_stage": state.get("recompute_stage"), "log": state.get("hitl_log") or []}))
+
     @app.post("/returns/{rid}/resolve")
-    async def resolve(request: Request, rid: str, action: str = Form(...), note: str = Form(""), filing_status: str = Form(""), facts_patch: str = Form(""), interrupt_id: str = Form("")):
+    async def resolve(request: Request, rid: str, action: str = Form(...), note: str = Form(""), filing_status: str = Form(""), facts_patch: str = Form(""), interrupt_id: str = Form(""), note_transfer_id: str = Form(""), note_chunk_index: int = Form(0), note_final_chunk: bool = Form(False)):
         me = require_staff(request, "resolve_escalation")
         check_return_id(rid)
         await verify_csrf(request, me)
         ratelimit.STAFF_WRITE.hit(me.subject)
+
+        async def invalid_facts(message: str):
+            if request.headers.get("accept") == "application/json":
+                return JSONResponse({"error": {"field": "facts_patch", "message": message}, "return_url": f"/returns/{rid}"}, status_code=400)
+            return await render_return(request, rid, status_code=400,
+                                       form_values={"facts_patch": facts_patch, "filing_status": filing_status, "note": note, "action": action},
+                                       facts_patch_error=message)
+
         patch: dict[str, Any] = {}
         if facts_patch.strip():
             try:
                 parsed = json.loads(facts_patch)
             except json.JSONDecodeError as e:
-                raise service.ServiceError(f"facts_patch is not valid JSON: {e.msg}") from e
+                return await invalid_facts(f"Invalid JSON at line {e.lineno}, column {e.colno}: {e.msg}. Correct it and try again.")
             if not isinstance(parsed, dict):
-                raise service.ServiceError("facts_patch must be a JSON object, for example {\"filing_status\": \"mfj\"}.")
+                return await invalid_facts('Facts must be a JSON object, for example {"estimated_payments": 500}.')
             patch.update(parsed)
         if filing_status.strip():
             patch["filing_status"] = filing_status.strip()
-        resolution: dict[str, Any] = {"action": action, "note": note.strip()}
+        resolution: dict[str, Any] = {"action": action, "note": note if action == "append_intervention_note" else note.strip()}
+        if action == "append_intervention_note":
+            resolution.update(note_transfer_id=note_transfer_id, note_chunk_index=note_chunk_index, note_final_chunk=note_final_chunk)
         if patch:
             resolution["facts_patch"] = patch
-        await run_in_threadpool(lambda: service.resolve(rid, resolution, actor=me, interrupt_id=interrupt_id or ""))
+        try:
+            result = await run_in_threadpool(lambda: service.resolve(rid, resolution, actor=me, interrupt_id=interrupt_id or ""))
+        except service.FactsPatchError as exc:
+            return await invalid_facts(str(exc))
+        if request.headers.get("accept") == "application/json":
+            return JSONResponse(pii.redact_deep({"interrupt_id": service.pending_id(rid), "last_log": (result.get("hitl_log") or [None])[-1]}))
         return RedirectResponse(f"/returns/{rid}", status_code=303)
 
     @app.post("/returns/{rid}/run")

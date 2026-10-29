@@ -89,7 +89,7 @@ def test_1099r_box_2b_is_parsed_as_true():
     assert rec["out_of_scope"] is False  # the escalation is eligibility's call, not extraction's
 
 
-@pytest.mark.parametrize("marker, expected", [("X", True), ("x", True), ("true", True), (1, True), (False, False), (None, False), ("", False)])
+@pytest.mark.parametrize("marker, expected", [("X", True), ("x", True), ("true", True), (1, True), (False, False), (None, None), ("", None)])
 def test_1099r_checkbox_markers(marker, expected):
     rec = extract_one({"id": "r", "kind": "1099-R", "payload": {"gross_distribution": 100, "taxable_amount": 100, "taxable_not_determined": marker, "tax_year": "2025"}})
     assert rec["fields"]["taxable_not_determined"] is expected

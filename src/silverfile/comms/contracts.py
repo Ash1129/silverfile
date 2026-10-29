@@ -18,16 +18,17 @@ from __future__ import annotations
 
 from typing import Any
 
-COMMON_WRITES = frozenset({"handoffs", "events", "token_log", "mailbox"})
+COMMON_WRITES = frozenset({"handoffs", "events", "token_log", "mailbox", "hitl_log"})
 
 WRITES: dict[str, frozenset[str]] = {
-    "orchestrator": frozenset({"next_agent", "computation_version", "status", "loop_guard_tripped", "escalations", "extraction_done", "revise_target"}),
+    "orchestrator": frozenset({"next_agent", "computation_version", "status", "loop_guard_tripped", "escalations", "extraction_done", "revise_target", "blocking_review"}),
     "intake": frozenset({"intake", "intake_complete", "intake_cursor", "messages", "escalations", "documents_in"}),
     "extraction": frozenset({"extracted", "extraction_done"}),
-    "eligibility": frozenset({"eligibility", "escalations"}),
-    "computation": frozenset({"lines", "provenance", "computation_version", "computation_notes"}),
-    "review": frozenset({"review_history", "review_round", "review_passed", "revise_target", "revise_reasons"}),
-    "escalation": frozenset({"escalations", "pending_escalation_id", "intake", "eligibility", "review_passed", "revise_target", "halted_reason", "status", "loop_guard_tripped", "review_round"}),
+    "eligibility": frozenset({"eligibility", "escalations", "recompute_stage", "human_edit"}),
+    "computation": frozenset({"lines", "provenance", "computation_version", "computation_notes", "escalations", "recompute_stage", "human_edit"}),
+    "review": frozenset({"review_history", "review_round", "review_passed", "revise_target", "revise_reasons", "recompute_stage", "blocking_review"}),
+    "escalation": frozenset({"escalations", "pending_escalation_id", "intake", "eligibility", "review_passed", "revise_target", "halted_reason", "status", "loop_guard_tripped", "review_round", "lines", "provenance", "provenance_seal", "blocking_review", "human_edit", "recompute_stage", "resolution_request"}),
+    "resolution_check": frozenset({"resolution_request", "escalations", "blocking_review", "loop_guard_tripped"}),
     "finalize": frozenset({"status", "halted_reason", "provenance_seal"}),  # the seal is security/integrity.py's, written as the draft completes
 }
 
@@ -38,6 +39,7 @@ READS: dict[str, tuple[str, ...]] = {
     "computation": ("intake", "eligibility", "extracted", "computation_version"),
     "review": ("lines", "provenance", "eligibility", "extracted", "intake", "escalations", "review_round"),
     "escalation": ("escalations", "intake", "intake_complete"),
+    "resolution_check": ("resolution_request", "escalations", "intake", "eligibility", "extracted", "blocking_review", "human_edit"),
     "finalize": ("eligibility", "halted_reason", "loop_guard_tripped", "review_round"),
 }
 
@@ -48,6 +50,7 @@ GOALS: dict[str, str] = {
     "computation": "populate every derived line through tax_math",
     "review": "try to falsify the assembled return",
     "escalation": "pause for a person to resolve the open escalation",
+    "resolution_check": "verify the human action with deterministic rules and record yes or no",
     "finalize": "close the return",
 }
 
@@ -55,5 +58,9 @@ GOALS: dict[str, str] = {
 def enforce_write_contract(agent: str, update: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Split an update into the keys the agent may write and the ones it may not."""
     allowed = WRITES.get(agent, frozenset()) | COMMON_WRITES
-    clean = {k: v for k, v in update.items() if k in allowed}
-    return clean, sorted(k for k in update if k not in allowed)
+    illegal = {k for k in update if k not in allowed}
+    if agent == "escalation":
+        # Human editing may invalidate derived records, never supply replacement figures.
+        illegal.update(k for k in ("lines", "provenance") if k in update and update[k] != {})
+    clean = {k: v for k, v in update.items() if k not in illegal}
+    return clean, sorted(illegal)

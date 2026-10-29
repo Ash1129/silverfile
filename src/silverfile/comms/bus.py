@@ -117,7 +117,9 @@ def _asked_slot(update: dict[str, Any]) -> str | None:
 def communicating(agent: str, fn: Callable[[ReturnState], dict[str, Any]]) -> Callable[[ReturnState], dict[str, Any]]:
     @functools.wraps(fn)
     def node(state: ReturnState) -> dict[str, Any]:
+        from ..agents.escalation import after_remediation_step
         raw = fn(state) or {}
+        raw = after_remediation_step(agent, state, raw)
         update, illegal = enforce_write_contract(agent, raw)
         if illegal and os.environ.get("SILVERFILE_STRICT_CONTRACTS") == "1":
             raise ContractViolation(f"{agent} may not write {illegal}")

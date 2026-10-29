@@ -26,7 +26,7 @@ from langgraph.types import interrupt
 from .. import llm
 from ..config import settings
 from ..provenance import now_iso
-from ..security import injection, pii
+from ..security import injection, pii, validate
 from ..state import Escalation, IntakeFacts, ReturnState
 
 SSN_RE = pii.SSN_RE
@@ -35,7 +35,7 @@ ADVICE_RE = re.compile(
     r"would it help|which (?:one |status |option )?(?:is|would be) (?:better|cheaper)|how (?:can|do) (?:i|we) (?:pay|owe) less|"
     r"roth|convert my ira|save on tax|lower my tax|reduce my tax|minimi[sz]e my tax|write off|claim .* deduction|file separately to)\b", re.I)
 GO_BACK_RE = re.compile(r"\b(go back|change|correct|fix|actually|i meant|earlier i said|wrong)\b", re.I)
-UNSURE_RE = re.compile(r"\b(not sure|don't know|dont know|no idea|unsure|can't remember|cannot remember|i forget)\b", re.I)
+UNSURE_RE = re.compile(r"\b(not sure|not certain|don't know|dont know|no idea|unsure|uncertain|unknown|maybe|probably|i think|can't tell|cannot tell|unreadable|can't remember|cannot remember|i forget)\b", re.I)
 
 # Guardrails B: who is answering. Brief §4.4 condition 6 is "a third party answering on the
 # taxpayer's behalf without a stated authority". The trigger is someone *acting for* the
@@ -241,6 +241,8 @@ def parse_date(s: str) -> str | None:
 
 
 def parse_money(s: str) -> float | None:
+    if UNSURE_RE.search(s):
+        return None
     if re.search(r"\b(none|no|nothing|zero|didn't|did not|nope)\b", s, re.I):
         return 0.0
     m = re.search(r"\$?\s*([\d,]+(?:\.\d{1,2})?)", s)
@@ -248,6 +250,8 @@ def parse_money(s: str) -> float | None:
 
 
 def parse_yes_no(s: str) -> bool | None:
+    if UNSURE_RE.search(s):
+        return None
     if re.search(r"\b(yes|yeah|yep|correct|i am|that's right|right|true|sure)\b", s, re.I):
         return True
     if re.search(r"\b(no|nope|not|never|false|none)\b", s, re.I):
@@ -283,6 +287,8 @@ def scripted_parse(slot: str, text: str, facts: IntakeFacts) -> dict[str, Any]:
     t = text.strip()
     up: dict[str, Any] = {}
     intent = "answer"
+    if UNSURE_RE.search(t) and slot in UNCERTAIN_SLOTS:
+        return {"updates": {}, "intent": "unsure"}
     if slot == "answering_party":
         up.update(answering_party_from(t))
     elif slot in ("name", "spouse_name"):
@@ -467,11 +473,35 @@ def sanitize_parse(slot: str, data: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- applying
+UNCERTAIN_SLOTS = {
+    "blind": "taxpayer.blind", "spouse_blind": "spouse.blind",
+    "can_be_claimed": "can_be_claimed_as_dependent", "dependents": "dependents",
+    "estimated_payments": "estimated_payments", "schedule1_adjustments": "schedule1_adjustments",
+    "schedule1_other_income": "schedule1_other_income", "schedule2_line3": "schedule2_line3",
+    "schedule3_line8": "schedule3_line8", "refund_account_is_own": "refund_account_is_own",
+}
+
+
 def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str]) -> IntakeFacts:
     f: IntakeFacts = json.loads(json.dumps(facts))  # deep copy; TypedDict is a plain dict
+    if UNSURE_RE.search(str(parsed.get("_text") or "")):
+        # A model's confident parse cannot override uncertainty in the actual answer.
+        parsed = {**parsed, "intent": "unsure", "updates": {}, "also": {}}
     up = parsed.get("updates") or {}
     tp = f.setdefault("taxpayer", {})
     sp = f.get("spouse") or {}
+    uncertain_key = UNCERTAIN_SLOTS.get(slot)
+    if uncertain_key and parsed.get("intent") == "unsure":
+        if "." in uncertain_key:
+            person, field = uncertain_key.split(".")
+            f[person] = {**(f.get(person) or {}), field: None}
+        else:
+            f[uncertain_key] = None
+        f["_unknown_fields"] = sorted({*(f.get("_unknown_fields") or []), uncertain_key})
+        reply.append("I have recorded that as unknown, not as no or zero. A Kushim preparer must confirm it before we continue.")
+        return f
+    if uncertain_key and any(v is not None for v in up.values()):
+        f["_unknown_fields"] = [k for k in f.get("_unknown_fields", []) if k != uncertain_key]
     if slot == "answering_party":
         if f.get("answering_party") == "third_party_no_authority":
             return f  # sticky: only a Kushim employee resolving the escalation can change it (agents/escalation.py)
@@ -550,8 +580,8 @@ def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str
         if up.get("value") is not None:
             f["can_be_claimed_as_dependent"] = bool(up["value"])
         elif parsed.get("intent") == "unsure":
-            f["can_be_claimed_as_dependent"] = False
-            f.setdefault("noted_questions", []).append("Taxpayer unsure whether someone can claim them as a dependent; assumed no.")
+            f["can_be_claimed_as_dependent"] = None
+            f.setdefault("noted_questions", []).append("Whether someone can claim the taxpayer is unknown; a preparer must confirm it.")
     elif slot == "documents_declared":
         f["documents_declared"] = up.get("kinds") or []
         if not f["documents_declared"]:
@@ -719,6 +749,9 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
         escalations.append(Escalation(id="esc-third-party", kind="exploitation", reason="A third party is answering on the taxpayer's behalf without a stated authority.", raised_by="intake", raised_at=now_iso(), details={"statement": facts.get("third_party_authority")}, status="open", resolution=None, resolved_by=None, resolved_at=None))
     if facts.get("refund_account_is_own") is False and not any(e.get("kind") == "exploitation" and "refund" in e.get("reason", "") for e in [*state.get("escalations", []), *escalations]):
         escalations.append(Escalation(id="esc-refund-account", kind="exploitation", reason=f"The refund would go to an account the taxpayer cannot describe as their own: {facts.get('refund_account_description')!r}.", raised_by="intake", raised_at=now_iso(), details={}, status="open", resolution=None, resolved_by=None, resolved_at=None))
+    unknown = validate.unknown_fact_actions({"intake": facts})
+    if unknown and not any(e.get("kind") == "uncertain_fact" and e.get("status") == "open" for e in state.get("escalations", [])):
+        escalations.append(Escalation(id=f"esc-unknown-{slot}", kind="uncertain_fact", reason="A required fact is unknown and must not be treated as no or zero.", raised_by="intake", raised_at=now_iso(), details={"required_actions": unknown, "citation": "REF-ES-1"}, status="open", resolution=None, resolved_by=None, resolved_at=None))
     docs_update = {}
     if slot == "upload" and new_docs:
         docs_update = {"documents_in": [*state.get("documents_in", []), *new_docs]}

@@ -31,7 +31,7 @@ from typing import Any, Iterable
 from ..provenance import now_iso
 from ..state import AgentMessage
 
-WORKERS = ("intake", "extraction", "eligibility", "computation", "review", "escalation", "finalize")
+WORKERS = ("intake", "extraction", "eligibility", "computation", "review", "escalation", "resolution_check", "finalize")
 REVISABLE = ("computation", "extraction", "eligibility", "intake")  # agents a review work order can go to
 PARTIES = ("orchestrator", *WORKERS, "human", "taxpayer")
 PERFORMATIVES = ("request", "inform", "revise", "done", "escalate", "resolve", "refuse", "violation", "ask", "answer")
@@ -59,7 +59,7 @@ def _channels() -> dict[tuple[str, str], frozenset[str]]:
     c[("review", "revise")] = frozenset(REVISABLE)
     for w in REVISABLE:
         c[(w, "done")] = frozenset({"review"})
-    for w in ("intake", "eligibility", "review", "orchestrator"):
+    for w in ("intake", "eligibility", "computation", "review", "orchestrator"):
         c[(w, "escalate")] = frozenset({"human"})
     c[("human", "resolve")] = frozenset({"orchestrator"})
     c[("orchestrator", "violation")] = frozenset({"human"})

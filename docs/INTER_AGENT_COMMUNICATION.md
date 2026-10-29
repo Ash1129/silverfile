@@ -56,7 +56,7 @@ Performatives are a small subset of FIPA-ACL:
 `contracts.WRITES` lists, for each agent, the state keys it may write. `READS` lists what it is given. The `communicating(agent, fn)` wrapper in `bus.py` applies the write contract to every node's update. A key outside the contract is dropped before it reaches state, and a `violation` message plus an event record the attempt. With `SILVERFILE_STRICT_CONTRACTS=1` the wrapper raises instead, for development. The rules that matter most:
 
 - Review cannot write `lines` or `provenance`. It can only send work back.
-- Only Computation writes `lines` and `provenance`. Only Extraction writes `extracted`. Only Intake writes `messages` (the conversation).
+- Only Computation populates `lines` and `provenance`; completing a human edit may clear those records to invalidate stale results, but cannot supply replacement figures. The deterministic `resolution_check` worker verifies staff continuation requests and records a yes/no outcome in `hitl_log`. Only Extraction writes `extracted`. Only Intake writes `messages` (the conversation).
 
 Each orchestrator `request` lists the agent's read contract, so anyone reading the log can see what context the handoff carried. For example, Computation's request shows that it does not read the conversation.
 

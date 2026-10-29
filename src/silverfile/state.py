@@ -23,7 +23,7 @@ from typing import Annotated, Any, Literal, TypedDict
 from langgraph.graph.message import add_messages
 
 FilingStatus = Literal["single", "mfj", "mfs", "hoh", "qss"]
-AgentName = Literal["orchestrator", "intake", "extraction", "eligibility", "computation", "review", "escalation"]
+AgentName = Literal["orchestrator", "intake", "extraction", "eligibility", "computation", "review", "escalation", "resolution_check"]
 ReturnStatus = Literal["new", "intake", "extracting", "eligibility", "computing", "review", "waiting_human", "complete", "halted"]
 
 
@@ -152,7 +152,7 @@ class ReviewRound(TypedDict, total=False):
 
 class Escalation(TypedDict, total=False):
     id: str
-    kind: str  # out_of_scope | conflict | r_box2b | advice | filing_status | exploitation | loop_guard | review_unresolved | chart_not_applicable | eligibility
+    kind: str  # out_of_scope | conflict | r_box2b | advice | filing_status | exploitation | loop_guard | review_unresolved | chart_not_applicable | eligibility | uncertain_fact
     reason: str
     raised_by: AgentName
     raised_at: str
@@ -161,6 +161,34 @@ class Escalation(TypedDict, total=False):
     resolution: dict[str, Any] | None
     resolved_by: str | None
     resolved_at: str | None
+
+
+class BlockingReviewEvent(TypedDict, total=False):
+    id: str
+    escalation_id: str
+    status: Literal["open", "resolved"]
+    required_actions: list[dict[str, Any]]
+    resolved_by: str
+    resolved_at: str
+    resolved_revision: str
+    intervention_note: str
+    note_revision: str
+    note_saved_by: str
+    note_saved_at: str
+    note_draft: dict[str, Any] | None
+    accepted_at: str
+    accepted_by: str
+
+
+class HumanEdit(TypedDict, total=False):
+    id: str
+    escalation_id: str
+    status: Literal["editing", "completed", "recomputed", "blocked"]
+    facts_patch: dict[str, Any]
+    started_by: str
+    completed_by: str
+    completed_at: str
+    computation_version: int
 
 
 class TokenEvent(TypedDict, total=False):
@@ -274,6 +302,11 @@ class ReturnState(TypedDict, total=False):
     # escalation / HITL
     escalations: Annotated[list[Escalation], merge_escalations]
     pending_escalation_id: str | None
+    blocking_review: BlockingReviewEvent | None
+    human_edit: HumanEdit | None
+    recompute_stage: Literal["eligibility", "computation", "review"] | None
+    resolution_request: dict[str, Any] | None
+    hitl_log: Annotated[list[dict[str, Any]], operator.add]
     halted_reason: str | None
     # orchestration
     handoffs: Annotated[list[str], operator.add]

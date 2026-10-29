@@ -20,6 +20,7 @@ from . import injection, pii
 MAX_AMOUNT = 10_000_000.0  # no in-scope 1099 or W-2 box legitimately exceeds this for this profile
 MAX_TEXT = 120
 CHECKBOX_TRUE = (True, "true", "True", "X", "x", "yes", "Yes", 1, "1")
+CHECKBOX_FALSE = (False, "false", "False", "no", "No", 0, "0", "unchecked")
 FIELD_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 # Extra fields a known form may carry beyond its box schema, because an agent reads them.
 EXTRA_FIELDS = {"1099-R": {"account_type"}}
@@ -63,6 +64,35 @@ def money(v: Any) -> float | None:
         return None
 
 
+def checkbox(v: Any) -> bool | None:
+    """Three-valued input: an unrecognised or missing checkbox is unknown."""
+    if v in CHECKBOX_TRUE:
+        return True
+    if v in CHECKBOX_FALSE:
+        return False
+    return None
+
+
+def unknown_fact_actions(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Deterministic requirements for facts that must not silently become zero/false."""
+    facts = state.get("intake") or {}
+    unknown = set(facts.get("_unknown_fields") or [])
+    for key in ("estimated_payments", "schedule1_adjustments", "schedule1_other_income", "schedule2_line3", "schedule2_line21", "schedule3_line8", "can_be_claimed_as_dependent"):
+        if key in facts and facts[key] is None:
+            unknown.add(key)
+    for doc_id, doc in (state.get("extracted") or {}).items():
+        fields = doc.get("fields") or {}
+        if doc.get("kind") == "1099-R":
+            for key in ("taxable_not_determined", "ira_sep_simple"):
+                if fields.get(key) is None:
+                    unknown.add(f"document:{doc_id}:{key}")
+        for key, value in fields.items():
+            if value is None and key in {"wages", "net_benefits", "gross_distribution", "taxable_amount", "qcd_amount", "interest_income", "tax_exempt_interest", "ordinary_dividends", "qualified_dividends", "federal_withheld"}:
+                if key != "taxable_amount" or fields.get("taxable_not_determined") is not True:
+                    unknown.add(f"document:{doc_id}:{key}")
+    return [{"code": "confirm_unknown_fact", "field": key, "description": f"Confirm {key} from evidence; unknown is not zero or no.", "status": "pending"} for key in sorted(unknown)]
+
+
 def clean_fields(kind: str, raw: dict[str, Any], schema: dict[str, str], money_fields: set[str], checkbox_fields: set[str]) -> tuple[dict[str, Any], list[str], list[str]]:
     """(fields, issues, security_flags) for one document.
 
@@ -77,6 +107,8 @@ def clean_fields(kind: str, raw: dict[str, Any], schema: dict[str, str], money_f
         v = raw.get(k)
         if k in money_fields:
             m = money(v)
+            if kind == "1099-R" and k == "qcd_amount" and k not in raw:
+                m = 0.0  # no optional QCD claim supplied; an explicit unreadable/null claim stays unknown
             if v not in (None, "") and m is None:
                 issues.append(f"{k} ({schema[k]}) is not a readable amount: {str(v)[:40]!r}")
             elif m is not None and not (0 <= m <= MAX_AMOUNT):
@@ -85,7 +117,9 @@ def clean_fields(kind: str, raw: dict[str, Any], schema: dict[str, str], money_f
                 m = None
             fields[k] = m
         elif k in checkbox_fields:
-            fields[k] = v in CHECKBOX_TRUE
+            fields[k] = checkbox(v)
+            if fields[k] is None:
+                issues.append(f"{k} is unknown or unreadable; a person must confirm it")
         elif k == "employee_ssn_last4":
             fields[k] = _last4(v, issues, flags)
         else:
@@ -136,6 +170,7 @@ PATCH_FIELDS: dict[str, Any] = {
     "third_party_authority": str, "refund_account_description": str, "refund_account_is_own": bool,
     "estimated_payments": float, "schedule1_adjustments": float, "schedule1_other_income": float, "schedule2_line3": float, "schedule2_line21": float, "schedule3_line8": float,
     "mfs_spouse_itemizes": bool, "dual_status_alien": bool, "taxpayer": dict, "spouse": dict,
+    "dependents": list,
 }
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -167,7 +202,12 @@ def clean_facts_patch(patch: Any) -> dict[str, Any]:
         elif spec is list:
             if not isinstance(v, list) or len(v) > 12:
                 raise ValueError(f"{k} must be a list (at most 12 items).")
-            out[k] = [_patch_text(k, x) for x in v]
+            if k == "dependents":
+                if any(not isinstance(x, dict) or set(x) - {"name", "relationship", "ssn"} for x in v):
+                    raise ValueError("dependents must contain name, relationship and test-SSN objects.")
+                out[k] = [{field: pii.require_test_ssn(value) if field == "ssn" else _patch_text(field, value) for field, value in x.items()} for x in v]
+            else:
+                out[k] = [_patch_text(k, x) for x in v]
         elif spec is dict:
             out[k] = _person(k, v)
     return out
@@ -210,7 +250,7 @@ def _person(k: str, v: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------- checkpointed state
 STATUSES = {"new", "intake", "extracting", "eligibility", "computing", "review", "waiting_human", "complete", "halted"}
 ESCALATION_STATUSES = {"open", "resolved"}
-LIST_KEYS = ("handoffs", "events", "documents_in", "escalations", "review_history", "token_log")
+LIST_KEYS = ("handoffs", "events", "documents_in", "escalations", "review_history", "token_log", "hitl_log")
 
 
 def faults_allowed() -> bool:
@@ -264,6 +304,19 @@ def check_state(values: dict[str, Any], thread_id: str) -> list[str]:
     for k in ("review_round", "computation_version"):
         if k in values and not (isinstance(values[k], int) and 0 <= values[k] <= 100):
             problems.append(f"{k} is out of range")
+    event = values.get("blocking_review")
+    if event is not None and (not isinstance(event, dict) or event.get("status") not in {"open", "resolved"} or not isinstance(event.get("required_actions"), list)):
+        problems.append("malformed blocking review event")
+    edit = values.get("human_edit")
+    if edit is not None and (not isinstance(edit, dict) or edit.get("status") not in {"editing", "completed", "recomputed", "blocked"}):
+        problems.append("malformed human edit state")
+    if values.get("recompute_stage") not in (None, "eligibility", "computation", "review"):
+        problems.append("unknown recomputation stage")
+    if values.get("resolution_request") is not None and not isinstance(values["resolution_request"], dict):
+        problems.append("malformed resolution request")
+    for entry in values.get("hitl_log") or []:
+        if not isinstance(entry, dict) or not entry.get("event") or entry.get("result") not in (None, "yes", "no"):
+            problems.append("malformed human workflow log entry")
     return problems
 
 

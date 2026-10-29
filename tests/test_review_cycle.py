@@ -66,29 +66,29 @@ def test_persistent_corruption_hits_the_review_bound_then_escalates():
 
 
 def test_accepting_an_unresolved_review_cannot_complete_an_unsourced_amount():
-    """Line 9 no longer matches its provenance record: a person may accept the findings,
-    but the provenance guard in finalize still refuses to complete the draft."""
+    """An unsourced finding remains blocking until remediation and explicit resolution."""
     g, cfg, out = run_prefilled("corrupt-accept-unsourced", case1_document_list(), load_intake(CASE1), fault_injection={"corrupt_line": "9", "delta": 100, "rounds": 99})
     assert out["status"] == "waiting_human"
     final = resolve(g, cfg, "accept", note="shift noted for the preparer")
-    assert final["status"] == "halted"
-    assert final["halted_reason"].startswith("provenance guard: line 9")
+    assert final["status"] == "waiting_human"
+    assert final["blocking_review"]["status"] == "open"
+    assert final["hitl_log"][-1]["result"] == "no"
     assert not final.get("provenance_seal")
 
 
-def test_accepting_an_unresolved_review_completes_the_draft():
-    # the record moves with the line, so only the independent recomputation disagrees
+def test_accepting_a_sourced_but_unresolved_review_does_not_complete_the_draft():
+    # Matching provenance does not remove a blocking independent-recomputation finding.
     g, cfg, out = run_prefilled("corrupt-accept", case1_document_list(), load_intake(CASE1), fault_injection={"corrupt_line": "9", "delta": 100, "rounds": 99, "with_record": True})
     assert out["status"] == "waiting_human"
     final = resolve(g, cfg, "accept", note="shift noted for the preparer")
-    assert final["status"] == "complete"
-    assert final["provenance_seal"]["lines"] == len(final["lines"])
-    assert final["review_passed"] is True
+    assert final["status"] == "waiting_human"
+    assert not final.get("provenance_seal")
+    assert final["review_passed"] is False
     assert final["review_round"] == MAX_REVIEW_ROUNDS  # no further review rounds ran
     assert final["computation_version"] == MAX_REVIEW_ROUNDS
-    assert [e["status"] for e in final["escalations"]] == ["resolved"]
-    assert final["escalations"][0]["resolution"]["action"] == "accept"
-    assert interrupts(g, cfg) == []
+    assert [e["status"] for e in final["escalations"]] == ["open"]
+    assert final["blocking_review"]["status"] == "open"
+    assert interrupts(g, cfg)[0]["required_actions"]
 
 
 def test_review_never_changes_a_figure(clean_state):

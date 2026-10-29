@@ -62,7 +62,7 @@ def record(kind: str, /, *, actor: str | None = None, return_id: str | None = No
     """Append one event of type `kind`. Never raises into the request that caused it."""
     try:
         clean = json.dumps(pii.redact_deep(detail), sort_keys=True, default=str)
-        if len(clean) > 4000:
+        if len(clean) > 4000 and kind != "hitl_workflow":
             clean = json.dumps({"truncated": clean[:3900]})
         actor = pii.redact(actor) if actor else None
         with _lock, _db() as conn:

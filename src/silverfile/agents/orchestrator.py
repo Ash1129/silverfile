@@ -16,6 +16,7 @@ from ..comms.protocol import WORKERS, make_message, next_seq
 from ..provenance import now_iso
 from ..security.validate import faults_allowed
 from ..state import LOOP_PATTERN_REPEATS, MAX_HANDOFFS, MAX_REVIEW_ROUNDS, Escalation, ReturnState
+from .escalation import log_entry, new_blocking_review
 
 GUARDED = ("extraction", "eligibility", "computation", "review", "escalation")  # intake turns are legitimate repetition
 
@@ -52,6 +53,10 @@ def decide_next(state: ReturnState) -> str:
     """The orchestrator's decision, as a label. `route` turns it into edges."""
     if state.get("status") in ("complete", "halted"):
         return "end"
+    if state.get("recompute_stage"):
+        return state["recompute_stage"]
+    if state.get("resolution_request"):
+        return "resolution_check"
     fault = (state.get("fault_injection") or {}) if faults_allowed() else {}
     if fault.get("ping_pong") and state.get("intake_complete") and not state.get("loop_guard_tripped"):
         # test hook: a pathological handoff cycle between two agents
@@ -111,6 +116,8 @@ def orchestrator_node(state: ReturnState) -> dict[str, Any]:
         reasons = state.get("revise_reasons") or []
         out["escalations"] = [Escalation(id=f"esc-review-{state.get('review_round', 0)}", kind="review_unresolved", reason=f"Review did not pass after {state.get('review_round', 0)} round(s). Findings: " + "; ".join(reasons[:6]), raised_by="review", raised_at=now_iso(), details={"findings": reasons}, status="open", resolution=None, resolved_by=None, resolved_at=None)]
         out["status"] = "waiting_human"
+        out["blocking_review"] = new_blocking_review(state, out["escalations"][0]["id"])
+        out["hitl_log"] = [log_entry("blocking_review_opened", result="no", blocking_review_id=out["blocking_review"]["id"], required_actions=out["blocking_review"]["required_actions"])]
     if nxt == "extraction" and (state.get("revise_target") == "extraction" or open_work_orders(state, "extraction")):
         out["extraction_done"] = False
     if nxt in ("computation", "eligibility", "extraction") and state.get("revise_target"):

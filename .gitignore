@@ -24,3 +24,6 @@ data/runtime/
 *.sqlite-wal
 *.sqlite-shm
 *.db
+
+# Agent scratch files, local environments, test output and validation records.
+/agent_workspace/

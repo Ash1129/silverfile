@@ -92,6 +92,7 @@ ul.plain { padding-left: 1.2rem; margin: .25rem 0; }
 .gate-form input { font: inherit; padding: .55rem .7rem; border: 1px solid var(--rule); border-radius: 4px; }
 .gate-form .button { align-self: flex-start; }
 .error { color: #8a1c1c; font-weight: 600; }
+textarea[aria-invalid="true"] { border-color: var(--red); outline-color: var(--red); }
 .top nav form { display: inline; margin-left: 1rem; }
 .top nav .linkish { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
 /* security additions */

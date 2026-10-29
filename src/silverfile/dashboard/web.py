@@ -101,7 +101,7 @@ class SecurityMiddleware:
             if message["type"] == "http.response.start":
                 h = list(message.get("headers") or [])
                 add = {
-                    "content-security-policy": f"default-src 'none'; script-src 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+                    "content-security-policy": f"default-src 'none'; script-src 'nonce-{nonce}'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
                     "x-content-type-options": "nosniff",
                     "x-frame-options": "DENY",
                     "referrer-policy": "no-referrer",

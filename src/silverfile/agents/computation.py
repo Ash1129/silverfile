@@ -16,18 +16,20 @@ from ..faults import apply_computation_faults
 from ..provenance import record, user_input
 from ..state import Provenance, ReturnState
 from ..tax_math.client import TaxMathClient
+from ..security.validate import unknown_fact_actions
+from ..provenance import now_iso
 
 
 def _num(v: Any) -> float:
     if v in (None, "", "None"):
-        return 0.0
+        raise ValueError("An unknown amount cannot be used as zero.")
     if isinstance(v, (int, float)):
         return float(v)
     s = str(v).replace(",", "").replace("$", "").strip()
     try:
         return float(s)
     except ValueError:
-        return 0.0
+        raise ValueError("An unreadable amount must be confirmed before computation.") from None
 
 
 def _docs_of(state: ReturnState, kind: str) -> list[dict[str, Any]]:
@@ -35,6 +37,9 @@ def _docs_of(state: ReturnState, kind: str) -> list[dict[str, Any]]:
 
 
 def run_computation(state: ReturnState) -> dict[str, Any]:
+    unknown = unknown_fact_actions(state)
+    if unknown:
+        return {"escalations": [{"id": "esc-computation-unknown", "kind": "uncertain_fact", "reason": "Required computation inputs are unknown.", "raised_by": "computation", "raised_at": now_iso(), "details": {"required_actions": unknown}, "status": "open"}], "handoffs": ["computation"], "events": ["computation blocked: required facts are unknown"]}
     facts = state.get("intake", {}) or {}
     elig = state.get("eligibility", {}) or {}
     fs = elig.get("filing_status") or facts.get("filing_status") or "single"
@@ -104,9 +109,13 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
 
         # ---- direct user inputs (Schedules 1, 2, 3; estimated payments) -----
         for line, key in (("8", "schedule1_other_income"), ("10", "schedule1_adjustments"), ("17", "schedule2_line3"), ("23", "schedule2_line21"), ("20", "schedule3_line8"), ("26", "estimated_payments")):
-            v = _num(facts.get(key))
+            v = _num(facts.get(key, 0.0))  # absent, unclaimed optional schedules; explicit unknowns are blocked above
             lines[line] = call("sum_amounts", amounts=[v])  # normalised to cents by the tool, not here
-            prov[line] = user_input(line, v, entered_by, note=None if facts.get(key) not in (None, "") else "not provided; treated as 0")
+            edit = state.get("human_edit") or {}
+            source_actor = f"staff:{edit['completed_by']}" if key in (edit.get("facts_patch") or {}) and edit.get("completed_by") else entered_by
+            prov[line] = user_input(line, v, source_actor, note=None if key in facts else "No optional claim supplied for this profile.")
+            if source_actor != entered_by:
+                prov[line]["entered_at"] = edit.get("completed_at")
         lines["7"] = 0.0
         prov["7"] = record("7", 0.0, source_kind="computed", sources=[], method="out of scope (Schedule D); 0 by profile", citations=["REF-SC-2"])
         lines["19"] = 0.0

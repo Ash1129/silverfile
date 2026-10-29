@@ -276,3 +276,59 @@ def test_an_unrequested_ssn_is_not_kept_and_the_person_is_told():
 def test_no_dependents_said_any_natural_way_is_not_taken_as_a_name(answer):
     state, _ = converse({**SINGLE, "dependents": answer}, stop_at="documents_declared")
     assert state["intake"]["dependents"] == []
+
+# ---------------------------------------------------------------- unknown facts are not negative answers
+@pytest.mark.parametrize("answer", ["I'm not sure", "I don't know", "No idea", "I cannot remember", "Not sure, maybe 500"])
+def test_uncertain_answers_are_not_false_or_zero(answer):
+    from silverfile.agents.intake import parse_yes_no, parse_money, scripted_parse, apply
+    assert parse_yes_no(answer) is None
+    assert parse_money(answer) is None
+    for slot, field in (("can_be_claimed", "can_be_claimed_as_dependent"), ("estimated_payments", "estimated_payments")):
+        parsed = scripted_parse(slot, answer, {})
+        assert parsed["intent"] == "unsure"
+        facts = apply(slot, parsed, {}, [])
+        assert facts[field] is None and field in facts["_unknown_fields"]
+
+
+@pytest.mark.parametrize("answer", ["No", "None", "Nothing", "Zero"])
+def test_explicit_negative_amount_is_still_zero(answer):
+    from silverfile.agents.intake import parse_money
+    assert parse_money(answer) == 0.0
+
+
+def test_unknown_payment_pauses_and_a_confirmed_zero_can_resume(data_dir):
+    from silverfile import service
+    from silverfile.security import auth
+    system = auth.system("unknown-test")
+    facts = {**service.fixture_intake("case1_clean"), "estimated_payments": None, "_unknown_fields": ["estimated_payments"]}
+    rid = service.create_return(service.fixture_documents("case1_clean"), facts, actor=system)
+    out = service.run(rid)
+    assert out["status"] == "waiting_human" and not out["lines"]
+    out = service.resolve(rid, {"action": "continue"}, actor=system)
+    assert out["hitl_log"][-1]["result"] == "no"
+    out = service.resolve(rid, {"action": "continue", "facts_patch": {"estimated_payments": 0}}, actor=system)
+    assert out["status"] == "complete" and out["lines"]["26"] == 0
+    assert out["intake"]["_unknown_fields"] == []
+
+
+def test_unknown_box2b_is_preserved_and_blocks_computation(case1_intake):
+    from conftest import document, run_prefilled
+    from silverfile.security.validate import checkbox
+    assert checkbox(False) is False and checkbox("no") is False
+    assert checkbox(None) is None and checkbox("not sure") is None
+    doc = document("uncertain-r", "1099-R", "")
+    doc["payload"] = {"recipient_name": "Eleanor Whitfield", "gross_distribution": 1000, "taxable_amount": 1000, "taxable_not_determined": None, "ira_sep_simple": False, "federal_withheld": 0, "tax_year": "2025"}
+    _, _, out = run_prefilled("unknown-box", [doc], {**case1_intake, "documents_declared": ["1099-R"]})
+    assert out["extracted"]["uncertain-r"]["fields"]["taxable_not_determined"] is None
+    assert out["status"] == "waiting_human" and not out["lines"]
+    assert any(e["kind"] == "uncertain_fact" for e in out["escalations"])
+
+
+def test_model_confidence_cannot_override_explicit_uncertainty():
+    from silverfile.agents.intake import apply
+    guessed = {"intent": "answer", "updates": {"value": False}, "_text": "I am not sure"}
+    facts = apply("can_be_claimed", guessed, {}, [])
+    assert facts["can_be_claimed_as_dependent"] is None
+    guessed_status = {"intent": "answer", "updates": {"filing_status": "single"}, "_text": "I don't know"}
+    facts = apply("filing_status", guessed_status, {}, [])
+    assert not facts.get("filing_status") and facts["_filing_status_unsure"] is True
