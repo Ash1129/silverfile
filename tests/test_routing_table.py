@@ -153,6 +153,47 @@ def test_review_passing_beats_the_round_bound():
     assert decide_next(state(review_round=MAX_REVIEW_ROUNDS, review_passed=True)) == "finalize"
 
 
+# ---------------------------------------------------------------- human review: recompute and resolution check
+# Added after the human-review change (Guardrails A): two rows sit directly under the end states, so a
+# person's edit or Continue is carried through before anything else is routed.
+
+
+@pytest.mark.parametrize("stage", ["eligibility", "computation", "review"])
+def test_a_recompute_stage_routes_to_that_agent(stage):
+    assert decide_next(state(recompute_stage=stage)) == stage
+
+
+def test_a_pending_resolution_goes_to_the_resolution_check():
+    assert decide_next(state(resolution_request={"escalation_id": "esc-1", "action": "continue"})) == "resolution_check"
+
+
+def test_recompute_beats_a_pending_resolution():
+    s = state(recompute_stage="computation", resolution_request={"escalation_id": "esc-1", "action": "continue"})
+    assert decide_next(s) == "computation"
+
+
+@pytest.mark.parametrize("extra", [{"escalations": OPEN_ESC}, {"halted_reason": "x"}, {"revise_target": "human"}])
+def test_human_review_steps_beat_escalation_halt_and_review_findings(extra):
+    assert decide_next(state(recompute_stage="eligibility", **extra)) == "eligibility"
+    assert decide_next(state(resolution_request={"escalation_id": "esc-1", "action": "continue"}, **extra)) == "resolution_check"
+
+
+@pytest.mark.parametrize("status", ["complete", "halted"])
+def test_a_finished_return_ends_even_mid_recompute(status):
+    assert decide_next(state(status=status, recompute_stage="computation")) == "end"
+    assert decide_next(state(status=status, resolution_request={"escalation_id": "esc-1", "action": "continue"})) == "end"
+
+
+def test_node_follows_a_recompute_stage_and_numbers_the_computation_attempt():
+    out = orchestrator_node(state(recompute_stage="computation", computation_version=2))
+    assert out["next_agent"] == "computation" and out["computation_version"] == 3
+
+
+def test_node_hands_a_pending_resolution_to_the_resolution_check():
+    out = orchestrator_node(state(resolution_request={"escalation_id": "esc-1", "action": "continue"}))
+    assert out["next_agent"] == "resolution_check"
+
+
 # ---------------------------------------------------------------- priority: earlier rows win
 
 
