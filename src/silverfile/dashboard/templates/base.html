@@ -20,7 +20,20 @@
         <form method="post" action="/logout" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="linkish" type="submit">Log out</button></form>
       {% endif %}
       {% endblock %}
-      {% if request.state.key_session %}<form method="post" action="/key/forget" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="linkish" type="submit" title="Drop your API key from this server's memory">Forget my key</button></form>{% endif %}
+      {% if request.state.key_session and (gate_on or not hide_key) %}<span class="key-state">Using your key</span><form method="post" action="/key/forget" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="next" value="{{ key_next }}"><button class="linkish" type="submit" title="Drop your API key from this server's memory">Forget my key</button></form>{% endif %}
+      {% if key_ui and not gate_on and not hide_key and not request.state.key_session %}
+      <details class="keybox">
+        <summary>Offline mode · add API key</summary>
+        <form method="post" action="/key" class="keybox-form" autocomplete="off">
+          <input type="hidden" name="csrf_token" value="{{ csrf }}">
+          <input type="hidden" name="next" value="{{ key_next }}">
+          <label for="header_api_key">Your Anthropic API key, for this session only</label>
+          <input id="header_api_key" name="api_key" type="password" required placeholder="sk-ant-…" spellcheck="false" autocapitalize="off">
+          <button class="button primary" type="submit">Use for this session</button>
+          <p class="muted small">Not saved. It is checked once, then held in this server's memory for your browser session (12 hours, or until you click Forget my key), and never written to disk or logs or shown on a page. Without a key SilverFile runs offline with the demo documents.</p>
+        </form>
+      </details>
+      {% endif %}
     </nav>
   </div>
 </header>

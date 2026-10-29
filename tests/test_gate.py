@@ -1,6 +1,8 @@
-"""The key gate (dashboard/gate.py): off locally, on for shared copies; the
-visitor's key is checked once, kept in memory under a cookie-borne session id,
-used through llm.request_key for their requests, and forgotten on request."""
+"""Session API keys (dashboard/gate.py): the header "API key" control is available
+whenever the server has no key of its own; the full-page gate is the opt-in
+SILVERFILE_REQUIRE_KEY=1 version. The visitor's key is checked once, kept in
+memory under a cookie-borne session id, used through llm.request_key for their
+requests, and forgotten on request."""
 from __future__ import annotations
 
 import pytest
@@ -9,17 +11,20 @@ from fastapi.testclient import TestClient
 from silverfile import llm
 from silverfile.dashboard import gate
 from silverfile.dashboard.app import create_app
-from webhelpers import anon_token, login
+from silverfile.security import ratelimit
+from webhelpers import anon_token, login, start_taxpayer
 
 GOOD = "sk-ant-api03-" + "x" * 60
 
 
-@pytest.fixture
-def shared(tmp_path, monkeypatch):
-    """A shared-copy configuration: no env key, gate on, fresh data dir, no network for validation."""
+def _configure(tmp_path, monkeypatch, require_key: bool):
+    """No env key, fresh data dir, and a fake key check (no network). Returns the list of keys checked."""
     monkeypatch.setenv("SILVERFILE_DATA_DIR", str(tmp_path / "runtime"))
     monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    monkeypatch.setenv("SILVERFILE_REQUIRE_KEY", "1")
+    if require_key:
+        monkeypatch.setenv("SILVERFILE_REQUIRE_KEY", "1")
+    else:
+        monkeypatch.delenv("SILVERFILE_REQUIRE_KEY", raising=False)
     monkeypatch.delenv("SILVERFILE_SEED_DEMO", raising=False)
     checked: list[str] = []
 
@@ -34,22 +39,102 @@ def shared(tmp_path, monkeypatch):
 
     monkeypatch.setattr(gate, "validate_key", fake_validate)
     gate._sessions.clear()
+    return checked
+
+
+@pytest.fixture
+def shared(tmp_path, monkeypatch):
+    """A shared-copy configuration with the full-page gate on (SILVERFILE_REQUIRE_KEY=1)."""
+    checked = _configure(tmp_path, monkeypatch, require_key=True)
     with TestClient(create_app()) as client:
         yield client, checked
 
 
-def test_gate_is_off_locally(tmp_path, monkeypatch):
-    monkeypatch.setenv("SILVERFILE_DATA_DIR", str(tmp_path / "runtime"))
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
-    monkeypatch.delenv("SILVERFILE_REQUIRE_KEY", raising=False)
-    monkeypatch.delenv("SILVERFILE_SEED_DEMO", raising=False)
-    assert not gate.gate_enabled()
+@pytest.fixture
+def local(tmp_path, monkeypatch):
+    """No server key and no gate: offline mode, with the header control available."""
+    checked = _configure(tmp_path, monkeypatch, require_key=False)
     with TestClient(create_app()) as client:
-        r = client.get("/", follow_redirects=False)
-        assert r.status_code == 303 and r.headers["location"] == "/login"  # no key page, straight to staff login
-        login(client, "gate-local")
-        r = client.get("/")
-        assert r.status_code == 200 and "Start a return" in r.text and "api_key" not in r.text
+        yield client, checked
+
+
+def test_the_gate_is_off_without_the_require_key_setting(local):
+    client, _ = local
+    assert not gate.gate_enabled() and gate.key_ui_enabled()
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/login"  # no key wall, straight to staff login
+    login(client, "gate-local")
+    r = client.get("/")
+    assert r.status_code == 200 and "Start a return" in r.text
+    assert "Offline mode" in r.text and 'name="api_key"' in r.text  # the header control, closed until clicked
+    assert 'action="/key/forget"' not in r.text  # no forget button yet (the control's help text mentions the phrase)
+    assert client.get("/key").status_code == 200  # the page behind the control also exists locally
+
+
+def test_the_header_control_takes_a_key_without_the_gate(local):
+    client, checked = local
+    csrf = login(client, "hdr-staff")
+    r = client.post("/key", data={"api_key": GOOD, "csrf_token": csrf, "next": "/"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/" and checked == [GOOD]
+    sid = client.cookies.get(gate.SESSION_COOKIE)
+    assert sid and GOOD not in sid and gate.session_key(sid) == GOOD
+    html = client.get("/").text
+    assert "Using your key" in html and "Forget my key" in html and "Offline mode" not in html
+    assert GOOD not in html
+    r = client.post("/key/forget", data={"csrf_token": csrf, "next": "/"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/" and gate.session_key(sid) is None
+    assert "Offline mode" in client.get("/").text
+
+
+def test_the_header_form_needs_the_csrf_token(local):
+    client, checked = local
+    login(client, "hdr-csrf")
+    assert client.post("/key", data={"api_key": GOOD}).status_code == 403
+    assert checked == [] and gate.SESSION_COOKIE not in client.cookies
+
+
+def test_next_cannot_leave_the_site(local):
+    client, _ = local
+    csrf = login(client, "hdr-next")
+    r = client.post("/key", data={"api_key": GOOD, "csrf_token": csrf, "next": "https://evil.example/"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/"
+
+
+def test_a_bad_key_in_the_header_is_refused_and_shows_why(local):
+    client, checked = local
+    csrf = login(client, "hdr-bad")
+    r = client.post("/key", data={"api_key": "hello", "csrf_token": csrf, "next": "/"})
+    assert r.status_code == 400 and "start with sk-ant-" in r.text
+    assert checked == [] and gate.SESSION_COOKIE not in client.cookies
+
+
+def test_key_submissions_are_rate_limited(local):
+    client, _ = local
+    ratelimit.reset_all()
+    for _ in range(10):
+        assert client.post("/key", data={"api_key": "nope", "csrf_token": anon_token(client)}).status_code == 400
+    r = client.post("/key", data={"api_key": "nope", "csrf_token": anon_token(client)})
+    assert r.status_code == 429 and "Retry-After" in r.headers
+    ratelimit.reset_all()
+
+
+def test_taxpayer_pages_do_not_show_the_key_control(local):
+    client, _ = local
+    assert 'name="api_key"' not in client.get("/start").text
+    start_taxpayer(client)
+    page = client.get("/t").text
+    assert 'name="api_key"' not in page and "Offline mode" not in page
+
+
+def test_no_control_when_the_server_has_its_own_key(tmp_path, monkeypatch):
+    monkeypatch.setenv("SILVERFILE_DATA_DIR", str(tmp_path / "runtime"))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-owner")
+    monkeypatch.delenv("SILVERFILE_SEED_DEMO", raising=False)
+    assert not gate.key_ui_enabled()
+    with TestClient(create_app()) as client:
+        login(client, "hdr-owner")
+        html = client.get("/").text
+        assert 'name="api_key"' not in html and "Offline mode" not in html
         assert client.get("/key", follow_redirects=False).status_code == 303
 
 

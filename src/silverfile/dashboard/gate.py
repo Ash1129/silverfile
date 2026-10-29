@@ -1,16 +1,20 @@
-"""The key gate: a shared copy of the dashboard that runs the live models on
-each visitor's own Anthropic key.
+"""Session API keys: the header "API key" control, and the optional key gate.
 
-With SILVERFILE_REQUIRE_KEY=1 and no ANTHROPIC_API_KEY in the environment,
-every page except the key page itself asks the visitor for a key first. The
-key is checked with one cheap API call, kept in this process's memory under a
-random session id (the cookie carries only the id), used through
-llm.request_key for that visitor's requests, and dropped after TTL seconds or
-when they click "Forget my key". It is never written to disk or to the logs
-and never appears in a page. Each visitor's runs are billed to their own key.
+Whenever the server has no ANTHROPIC_API_KEY of its own, any visitor can open
+the "API key" control in the page header and paste their own. Until they do,
+SilverFile runs in offline mode (scripted intake, demo documents, rule-based
+review) and nothing is blocked. The key is checked with one cheap API call,
+kept in this process's memory under a random session id (the cookie carries
+only the id), used through llm.request_key for that visitor's requests, and
+dropped after TTL seconds or when they click "Forget my key". It is never
+written to disk or to the logs and never appears in a page. Each visitor's
+runs are billed to their own key.
 
-Locally, with ANTHROPIC_API_KEY set or SILVERFILE_REQUIRE_KEY unset, the gate
-is off and nothing here runs.
+The gate is the stricter, opt-in version: with SILVERFILE_REQUIRE_KEY=1 (and
+no server key) every page except the key page itself asks for a key first.
+
+With ANTHROPIC_API_KEY set in the environment the server has its own key, so
+neither the control nor the gate appears and nothing here runs.
 """
 from __future__ import annotations
 
@@ -35,11 +39,17 @@ except ImportError:  # pragma: no cover - the SDK is a hard requirement, this ke
 SESSION_COOKIE = "sf_key_session"
 TTL_SECONDS = 12 * 3600
 EXEMPT_PATHS = {"/key", "/key/forget", "/favicon.ico", "/healthz"}
+SESSION_PATHS = {"/key", "/key/forget"}  # exempt from the gate, but they still see who has a key session
 EXEMPT_PREFIXES = ("/static/",)
 KEY_PREFIX = "sk-ant-"
 
 _sessions: dict[str, tuple[str, float]] = {}  # sid -> (api key, expiry)
 _lock = threading.Lock()
+
+
+def key_ui_enabled() -> bool:
+    """The header control (and /key) exist whenever the server has no key of its own."""
+    return not settings().api_key
 
 
 def gate_enabled() -> bool:
@@ -136,17 +146,21 @@ class KeyGate:
         self.render_gate = render_gate
 
     async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
-        if scope["type"] != "http" or not gate_enabled() or is_exempt(scope.get("path", "")):
+        path = scope.get("path", "")
+        if scope["type"] != "http" or not key_ui_enabled() or (is_exempt(path) and path not in SESSION_PATHS):
             await self.app(scope, receive, send)
             return
         request = Request(scope, receive)
         key = session_key(request.cookies.get(SESSION_COOKIE))
         if key is None:
-            if scope.get("method") in ("GET", "HEAD"):  # HEAD too, so a health check sees 200
-                response = self.render_gate(request)
-            else:
-                response = HTMLResponse("<p>Enter your API key first: <a href='/key'>/key</a></p>", status_code=403)
-            await response(scope, receive, send)
+            if gate_enabled() and not is_exempt(path):
+                if scope.get("method") in ("GET", "HEAD"):  # HEAD too, so a health check sees 200
+                    response = self.render_gate(request)
+                else:
+                    response = HTMLResponse("<p>Enter your API key first: <a href='/key'>/key</a></p>", status_code=403)
+                await response(scope, receive, send)
+                return
+            await self.app(scope, receive, send)  # offline mode: no key, nothing blocked
             return
         scope.setdefault("state", {})["key_session"] = True
         token = llm.request_key.set(key)
