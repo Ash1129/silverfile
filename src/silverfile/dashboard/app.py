@@ -425,7 +425,7 @@ def create_app() -> FastAPI:
         me = require_taxpayer(request)
         rid = me.subject
         state = await run_in_threadpool(service.get_state, rid)
-        pend = service.pending(rid)
+        pend = service.pending_for_taxpayer(rid)
         return page(request, "taxpayer.html", state=state, pending=pend if pend and pend.get("type") in ("question", "upload") else None,
                     pending_id=service.pending_id(rid), waiting_on_kushim=bool(pend and pend.get("type") == "escalation") or state.get("status") == "waiting_human",
                     transcript=service.transcript_from_state(state), auto_refresh=state.get("status") in BUSY_STATUSES or state.get("status") == "new",

@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.types import interrupt
 
-from .. import llm
+from .. import llm, memory
 from ..config import settings
 from ..provenance import now_iso
 from ..security import injection, pii, validate
@@ -649,14 +649,8 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
     if slot is None or turns >= MAX_TURNS:
         return {"intake": facts, "intake_complete": True, "intake_cursor": None, "handoffs": ["intake"], "events": ["intake: complete" if slot is None else "intake: turn limit reached; handing to a person"], **({"escalations": [Escalation(id="esc-intake-turns", kind="conflict", reason="The intake conversation did not complete within the turn limit.", raised_by="intake", raised_at=now_iso(), details={}, status="open", resolution=None, resolved_by=None, resolved_at=None)]} if slot is not None else {})}
 
-    # resume summary after a gap
-    last = facts.get("_last_activity_at")
-    gap_min = 0.0
-    if last:
-        gap_min = (datetime.now(timezone.utc) - datetime.fromisoformat(last)).total_seconds() / 60
-    prefix = ""
-    if last and gap_min > 30 and slot not in ("answering_party",):
-        prefix = "Welcome back. Here's where we were: " + summarize_facts(facts) + " Let's continue. "
+    # resume summary after a gap (a question already waiting gets it from memory.with_resume_recap)
+    prefix = (memory.resume_recap(facts) or "") if slot not in ("answering_party",) else ""
     body, glossed = add_glosses(_q(slot, facts), facts)
     question = prefix + body
     if glossed:  # explained once per session; recorded with this turn's facts
@@ -711,7 +705,9 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
             events.append("intake: third party detected mid-conversation")
     if GO_BACK_RE.search(text) and slot not in ("confirm", "answering_party", "name") and not re.search(r"\d", text) and guess_slot(text) and guess_slot(text) != slot:
         target = guess_slot(text)
+        kept = json.loads(json.dumps(facts))
         _clear_slot(facts, target)
+        facts = memory.record_answer_changes(kept, facts, slot=str(target), at=now_iso())
         reply.append("Of course, let's go back to that.")
         return _finish(state, facts, slot, question, said, reply, turns, escalations, events + [f"intake: user went back to {target}"], tokens_in, tokens_out, repeat=False)
 
@@ -735,7 +731,7 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
     if UNSURE_RE.search(text) and parsed.get("intent") == "answer":
         parsed["intent"] = "unsure"
     before = json.dumps(facts, sort_keys=True)
-    facts = apply(slot, parsed, facts, reply)
+    facts = memory.record_answer_changes(json.loads(before), apply(slot, parsed, facts, reply), slot=slot, at=now_iso())
     if parsed.get("intent") == "unsure" and json.dumps(facts, sort_keys=True) == before and slot in ("filing_status", "dob", "ssn", "name"):
         if slot == "filing_status":
             facts["_filing_status_unsure"] = True
