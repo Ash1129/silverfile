@@ -67,7 +67,7 @@ def test_the_gate_is_off_without_the_require_key_setting(local):
     r = client.get("/")
     assert r.status_code == 200 and "Start a return" in r.text
     assert "Offline mode" in r.text and 'name="api_key"' in r.text  # the header control, closed until clicked
-    assert "Forget my key" not in r.text
+    assert 'action="/key/forget"' not in r.text  # no forget button yet (the control's help text mentions the phrase)
     assert client.get("/key").status_code == 200  # the page behind the control also exists locally
 
 
