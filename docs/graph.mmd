@@ -13,6 +13,7 @@ graph TD;
 	computation(computation)
 	review(review)
 	escalation(escalation)
+	resolution_check(resolution_check)
 	finalize(finalize)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> orchestrator;
@@ -29,7 +30,9 @@ graph TD;
 	orchestrator -.-> extract_document;
 	orchestrator -.-> finalize;
 	orchestrator -.-> intake;
+	orchestrator -.-> resolution_check;
 	orchestrator -.-> review;
+	resolution_check --> orchestrator;
 	review --> orchestrator;
 	finalize --> __end__;
 	orchestrator -.-> orchestrator;
