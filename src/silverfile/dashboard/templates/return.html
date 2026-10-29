@@ -60,29 +60,62 @@
       {% if escalation.details %}<details><summary>Details</summary><pre>{{ escalation.details | pretty | mask }}</pre></details>{% endif %}
       {% if pending and pending.type == "escalation" %}
       {% if can("resolve_escalation") %}
-      <form method="post" action="/returns/{{ rid }}/resolve" class="stack">
+      <form id="human-resolution-form" method="post" action="/returns/{{ rid }}/resolve" class="stack">
         <input type="hidden" name="csrf_token" value="{{ csrf }}">
         <input type="hidden" name="interrupt_id" value="{{ pending_id }}">
+        {% if facts_patch_error %}
+        <div class="error" role="alert">
+          <p>Your changes were not saved. Correct the facts JSON below and try again.</p>
+          <a href="/returns/{{ rid }}#human-resolution-form">Reload this return's saved form</a>
+        </div>
+        {% endif %}
         <p class="small">Resolving as <strong>{{ me.subject }}</strong> ({{ me.role }}). Your name, role, decision and the time go on the return and in the security log.</p>
-        <label>Note <textarea name="note" rows="2" placeholder="what was decided and why"></textarea></label>
-        <fieldset>
-          <legend>Action</legend>
-          <label class="check"><input type="radio" name="action" value="continue" checked> Continue — the return goes on (with any corrected facts below)</label>
-          <label class="check"><input type="radio" name="action" value="halt"> Halt — a Kushim preparer takes the return over</label>
-          <label class="check"><input type="radio" name="action" value="accept"> Accept — keep the draft with the findings noted (review_unresolved only)</label>
-        </fieldset>
+        <label>{% if state.blocking_review and state.blocking_review.status == "resolved" %}Human intervention explanation (required for Accept; no length limit){% else %}Action note (optional; the final explanation is requested after the blocking review is resolved){% endif %}
+          <textarea id="intervention-note" name="note" rows="4" placeholder="Explain the evidence checked, actions completed and why the draft can be accepted.">{{ form_values.get('note', state.blocking_review.intervention_note if state.blocking_review and state.blocking_review.intervention_note else '') }}</textarea>
+        </label>
         <label>Decide the filing status
-          <select name="filing_status">{% for v, l in filing_statuses %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+          <select name="filing_status">{% for v, l in filing_statuses %}<option value="{{ v }}"{% if form_values.get('filing_status', '') == v %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
         </label>
         <label>Other facts to correct (JSON object, optional)
-          <textarea name="facts_patch" rows="3" placeholder='{"estimated_payments": 500}'></textarea>
+          <textarea id="facts-patch-input" name="facts_patch" rows="3" placeholder='{"estimated_payments": 500}'{% if facts_patch_error %} aria-invalid="true" aria-describedby="facts-patch-error" autofocus{% endif %}>{{ form_values.get('facts_patch', '') }}</textarea>
         </label>
-        <button type="submit" class="button primary">Resolve</button>
+        {% if facts_patch_error %}<p id="facts-patch-error" class="error" role="alert">{{ facts_patch_error }}</p>{% endif %}
+        <div class="actions">
+          <button type="submit" name="action" value="continue" class="button primary">Continue and verify</button>
+          <button type="submit" name="action" value="start_edit" class="button">Start editing</button>
+          <button type="submit" name="action" value="save_edit" class="button">Save edit</button>
+          <button type="submit" name="action" value="complete_edit" class="button">Complete editing and recompute</button>
+          <button type="submit" name="action" value="halt" class="button danger">Hand off to a preparer</button>
+          {% if escalation.kind == "review_unresolved" %}
+          <button type="submit" name="action" value="resolve_review" class="button">Resolve blocking review event</button>
+          {% if state.blocking_review and state.blocking_review.status == "resolved" %}<button type="submit" name="action" value="save_intervention_note" class="button">Save intervention explanation</button>{% endif %}
+          <button id="accept-review" type="submit" name="action" value="accept" class="button primary" data-eligible="{{ 'yes' if not accept_requirements and not facts_patch_error else 'no' }}" disabled>Accept</button>
+          {% endif %}
+        </div>
+        <p id="note-save-status" role="status" aria-live="polite"></p>
       </form>
       {% else %}<p class="muted">Your role cannot resolve escalations; a preparer will.</p>{% endif %}
       {% else %}
       <p class="muted">The graph has not reached this escalation yet.{% if can("advance_return") %} <form method="post" action="/returns/{{ rid }}/run" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="button" type="submit">Advance</button></form>{% endif %}</p>
       {% endif %}
+    </section>
+    {% endif %}
+
+    {% if state.blocking_review or state.human_edit or state.hitl_log %}
+    <section class="card">
+      <h2>Human review workflow</h2>
+      {% if state.blocking_review %}<p>Blocking review event: <strong>{{ state.blocking_review.status }}</strong></p>{% endif %}
+      {% if state.human_edit %}<p>Human editing: <strong>{{ state.human_edit.status }}</strong>{% if state.human_edit.computation_version %} · computation version {{ state.human_edit.computation_version }}{% endif %}</p>{% endif %}
+      {% if state.blocking_review %}
+      <h3>Actions required before Accept</h3>
+      <ul>{% for item in state.blocking_review.required_actions %}<li><strong>{{ item.status }}</strong> · {{ item.description | mask }}</li>{% endfor %}</ul>
+      {% if accept_requirements %}<ul>{% for item in accept_requirements %}<li>{{ item.description | mask }}</li>{% endfor %}</ul>{% endif %}
+      <p class="muted">Complete the required corrections and recheck, explicitly resolve the event, then save the intervention explanation to the log to enable Accept.</p>
+      {% endif %}
+      <p><a href="/returns/{{ rid }}/hitl.json">Structured workflow log (JSON)</a></p>
+      {% for entry in state.hitl_log | reverse %}
+      <details><summary>{{ entry.event }}{% if entry.result %} · {{ entry.result }}{% endif %} · {{ entry.at | when }}</summary><pre>{{ entry | pretty | mask }}</pre></details>
+      {% endfor %}
     </section>
     {% endif %}
 
@@ -163,4 +196,60 @@
     {% endif %}
   </div>
 </div>
+<script nonce="{{ csp_nonce }}">
+  const acceptButton = document.getElementById('accept-review');
+  const interventionNote = document.getElementById('intervention-note');
+  if (acceptButton && interventionNote) {
+    const updateAccept = () => { acceptButton.disabled = acceptButton.dataset.eligible !== 'yes' || !interventionNote.value.trim() || interventionNote.value !== interventionNote.defaultValue; };
+    interventionNote.addEventListener('input', updateAccept);
+    updateAccept();
+  }
+  const resolutionForm = document.getElementById('human-resolution-form');
+  if (resolutionForm && interventionNote) {
+    resolutionForm.addEventListener('submit', async (event) => {
+      if (event.submitter?.value !== 'save_intervention_note' || new TextEncoder().encode(interventionNote.value).length <= 32768) return;
+      event.preventDefault();
+      const status = document.getElementById('note-save-status');
+      const buttons = [...resolutionForm.querySelectorAll('button')];
+      buttons.forEach(button => { button.disabled = true; });
+      const transfer = crypto.randomUUID().replaceAll('-', '');
+      const text = interventionNote.value;
+      let index = 0;
+      try {
+        for (let offset = 0; offset < text.length; index++) {
+          let end = Math.min(offset + 32768, text.length);
+          if (end < text.length && /[\uD800-\uDBFF]/.test(text[end - 1])) end--;
+          const fields = new URLSearchParams(new FormData(resolutionForm));
+          fields.set('action', 'append_intervention_note');
+          fields.set('facts_patch', '');
+          fields.set('filing_status', '');
+          fields.set('note', text.slice(offset, end));
+          fields.set('note_transfer_id', transfer);
+          fields.set('note_chunk_index', String(index));
+          fields.set('note_final_chunk', String(end === text.length));
+          let response;
+          do {
+            response = await fetch(resolutionForm.action, {method: 'POST', headers: {'Accept': 'application/json'}, body: fields});
+            if (response.status === 429) {
+              const seconds = Math.max(1, Number(response.headers.get('Retry-After')) || 1);
+              status.textContent = `Saving paused by the request rate limit; retrying in ${seconds} seconds.`;
+              await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+            }
+          } while (response.status === 429);
+          if (!response.ok) throw new Error('The explanation could not be saved. Reload and try again.');
+          const result = await response.json();
+          if (result.interrupt_id) resolutionForm.querySelector('[name="interrupt_id"]').value = result.interrupt_id;
+          if (result.last_log?.result !== 'yes') throw new Error('The explanation was blocked. Reload to inspect the required actions.');
+          status.textContent = `Saved explanation part ${index + 1}.`;
+          offset = end;
+        }
+        location.reload();
+      } catch (error) {
+        status.textContent = error.message;
+        buttons.forEach(button => { button.disabled = false; });
+        if (acceptButton) acceptButton.disabled = true;
+      }
+    });
+  }
+</script>
 {% endblock %}

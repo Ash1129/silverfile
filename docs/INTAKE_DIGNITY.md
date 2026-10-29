@@ -39,7 +39,7 @@ The person on the other end may be tired, hard of hearing, using a screen reader
 
 A single filer is asked for exactly one. Only 900-series test numbers are accepted. A real-looking number is refused with a plain explanation and is not kept, not even in the transcript.
 
-**Choice: what happens to an unrequested SSN.** When someone types an SSN where none was asked for (for example "No. Here's my social, 123-45-6789"):
+**Choice: what happens to an unrequested SSN.** When someone types an SSN where none was asked for (for example "No. Here's my social, ...", using a synthetic value from the test inputs):
 1. The number is removed from the answer before anything is parsed or saved. It never reaches a model, the facts, the transcript, a log or a trace.
 2. The rest of the answer still counts ("No" is still no).
 3. The person is told, in one plain sentence: "I noticed a Social Security number in your answer. I didn't need it here, so I haven't kept it."
@@ -84,10 +84,10 @@ Built by Daniel (agent memory) and Ashwin: every answer is a checkpoint, so noth
 
 Run `python run.py chat` and follow the case 1 answers in `demo/eval_case_1.md`, with these moments swapped in, in this order:
 
-1. **Question 3 (SSN):** type `123-45-6789`. It is refused, not kept, and asked again. Then type `912-34-5678`.
+1. **Question 3 (SSN):** use the deliberately rejected synthetic value from the intake dignity test inputs (never a real person's SSN). It is refused, not kept, and asked again. Then use the allowed 900-series test value from `data/fixtures/case1_clean/intake.json`. Full numbers belong in fixture inputs, not in this document or traces.
 2. **Question 5 (legally blind):** point out the one-line explanations of "legally blind" and "standard deduction". At question 7, "filing status" gets one too, and none is ever repeated.
 3. **Question 7 (filing status):** type `Would it help to file separately?`. It is declined kindly and noted for the preparer, and the return pauses for a Kushim employee. Type `{"action":"continue"}` at the prompt, and the same question is asked again. Then type `Single`.
-4. **Question 9 (someone else claim you):** type `No. Here's my social, 123-45-6789`. "No" counts, the number is not kept, and the person is told.
+4. **Question 9 (someone else claim you):** answer `No. Here's my social, ...`, replacing the ellipsis with the same rejected synthetic test value from step 1. "No" counts, the number is not kept, and the person is told.
 5. **Question 11 (other income):** type `Actually, can we go back to my date of birth?`. Only the date is re-asked. Type `March 14, 1954`, then `No` to the other-income question.
 6. **Any later question:** type `quit`, then `python run.py chat --resume <id>` (the id is printed at the top). Every answer was kept, and the conversation carries on. On the web, use "Save and leave" and come back with the access code, and the conversation so far is still there.
 7. **Upload step:** type `case1_clean`, then `Yes` at the summary, and the draft is produced.

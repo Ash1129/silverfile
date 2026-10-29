@@ -4,6 +4,6 @@
 <section class="card">
   <h1>{{ title }}</h1>
   <p>{{ message }}</p>
-  <p><a class="button" href="{{ back }}">Go back</a></p>
+  <p><a class="button" href="{{ back }}">{{ back_label or "Go back" }}</a></p>
 </section>
 {% endblock %}

@@ -33,7 +33,7 @@ def _tracked(*dirs: str) -> list[Path]:
 
 def test_committed_traces_and_docs_hold_no_full_ssn():
     files = _tracked(*TRACE_DIRS)
-    assert any("traces/" in str(f) for f in files)
+    assert any("traces/" in f.as_posix() for f in files)
     leaks = {str(f.relative_to(ROOT)): pii.find_ssns(f.read_text(errors="ignore"))[:3] for f in files if pii.find_ssns(f.read_text(errors="ignore"))}
     assert leaks == {}, f"full SSNs in committed files: {leaks}"
 

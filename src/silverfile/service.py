@@ -49,19 +49,23 @@ from .memory import session_summary
 from .provenance import now_iso
 from .security import audit, auth, crypto, pii, ratelimit, uploads, validate
 from .security.auth import Principal
+from .agents.escalation import HUMAN_ACTIONS
 
 FIXTURES_DIR = ROOT / "data" / "fixtures"
 DEMO_W2_IMAGE = ROOT / "demo" / "w2_image_1.jpg"
 KIND_HINTS = (("1099int", "1099-INT"), ("1099div", "1099-DIV"), ("1099r", "1099-R"), ("ssa", "SSA-1099"), ("w2", "W-2"))
-ACTIONS = ("continue", "halt", "accept")
+ACTIONS = HUMAN_ACTIONS
 MAX_ANSWER_CHARS = 1000
-MAX_NOTE_CHARS = 1000
 
 _lock = threading.RLock()  # graph invokes are serialised per process (one SQLite checkpointer)
 
 
 class ServiceError(ValueError):
     """A request that does not fit the return's current state (bad input, nothing pending)."""
+
+
+class FactsPatchError(ServiceError):
+    """An invalid facts patch, rejected before any workflow state is changed."""
 
 
 class Forbidden(PermissionError):
@@ -187,6 +191,9 @@ def _invoke(return_id: str, inp: Any, actor: Principal, action: str) -> dict[str
 
 
 def _audit_diff(rid: str, before: dict[str, Any], after: dict[str, Any], actor: Principal, action: str) -> None:
+    for entry in (after.get("hitl_log") or [])[len(before.get("hitl_log") or []):]:
+        detail = {k: v for k, v in entry.items() if k not in {"actor", "return_id"}}
+        audit.record("hitl_workflow", actor=actor.label, return_id=rid, workflow_actor=entry.get("actor"), **detail)
     old = {e.get("id"): e for e in before.get("escalations") or []}
     for e in after.get("escalations") or []:
         prev = old.get(e.get("id"))
@@ -349,13 +356,16 @@ def resolve(return_id: str, resolution: dict[str, Any], *, actor: Principal, int
         note = (resolution or {}).get("note") or ""
         if not isinstance(note, str):
             raise ServiceError("The note is plain text.")
-        res: dict[str, Any] = {"action": action, "note": pii.remove_ssns(note.strip())[:MAX_NOTE_CHARS]}
+        # Human intervention explanations have no application length limit.
+        res: dict[str, Any] = {"action": action, "note": note if action == "append_intervention_note" else pii.redact(note.strip())}
+        if action == "append_intervention_note":
+            res.update({k: resolution.get(k) for k in ("note_transfer_id", "note_chunk_index", "note_final_chunk")})
         patch = (resolution or {}).get("facts_patch")
         if patch not in (None, {}):
             try:
                 res["facts_patch"] = validate.clean_facts_patch(patch)
             except ValueError as e:
-                raise ServiceError(str(e)) from e
+                raise FactsPatchError(str(e)) from e
         res["resolved_by"] = ((resolution or {}).get("resolved_by") or actor.subject) if actor.kind == "system" else actor.subject
         res["resolved_by_role"] = actor.role
         res = {k: v for k, v in res.items() if v not in (None, "")}

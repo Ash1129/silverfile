@@ -16,6 +16,7 @@ from typing import Any
 from ..provenance import now_iso
 from ..state import Escalation, EligibilityResult, ReturnState
 from ..security.capabilities import tools_for
+from ..security.validate import unknown_fact_actions
 
 tm = tools_for("eligibility")  # only is_1040sr_eligible, count_12d_boxes and FILING_STATUSES
 
@@ -60,6 +61,8 @@ def run_eligibility(state: ReturnState) -> dict[str, Any]:
     escalate: list[dict[str, Any]] = []
     out_of_scope: list[str] = []
     conflicts: list[str] = []
+    for requirement in unknown_fact_actions(state):
+        escalate.append({"kind": "uncertain_fact", "reason": requirement["description"], "citation": "REF-ES-1"})
 
     def det(claim: str, result: Any, cite: str) -> None:
         dets.append({"claim": claim, "result": result, "citation": cite})

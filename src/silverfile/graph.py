@@ -28,7 +28,7 @@ from langgraph.graph import END, START, StateGraph
 
 from .agents.computation import run_computation
 from .agents.eligibility import run_eligibility
-from .agents.escalation import escalation_node
+from .agents.escalation import accept_requirements, escalation_node, resolution_check_node
 from .agents.extraction import aggregate_extraction_node, extract_document_node
 from .agents.intake import run_intake
 from .agents.orchestrator import orchestrator_node, route
@@ -42,6 +42,9 @@ from .state import ReturnState
 
 
 def finalize_node(state: ReturnState) -> dict[str, Any]:
+    event = state.get("blocking_review")
+    if state.get("recompute_stage") or (state.get("human_edit") or {}).get("status") in ("editing", "completed", "blocked") or (event and accept_requirements(state)):
+        return {"status": "halted", "halted_reason": "Human review or fact editing has not completed its required actions.", "handoffs": ["finalize"], "events": ["finalize: blocked by incomplete human review"]}
     if state.get("halted_reason") or state.get("loop_guard_tripped"):
         return {"status": "halted", "handoffs": ["finalize"], "events": [f"finalize: halted ({state.get('halted_reason') or 'loop guard'})"]}
     elig = state.get("eligibility") or {}
@@ -67,12 +70,13 @@ def build_graph():
     g.add_node("computation", communicating("computation", run_computation))
     g.add_node("review", communicating("review", run_review))
     g.add_node("escalation", communicating("escalation", escalation_node))
+    g.add_node("resolution_check", communicating("resolution_check", resolution_check_node))
     g.add_node("finalize", communicating("finalize", finalize_node))
 
     g.add_edge(START, "orchestrator")
-    g.add_conditional_edges("orchestrator", route, ["intake", "extract_document", "aggregate_extraction", "eligibility", "computation", "review", "escalation", "finalize", "orchestrator"])
+    g.add_conditional_edges("orchestrator", route, ["intake", "extract_document", "aggregate_extraction", "eligibility", "computation", "review", "escalation", "resolution_check", "finalize", "orchestrator"])
     g.add_edge("extract_document", "aggregate_extraction")
-    for spoke in ("intake", "aggregate_extraction", "eligibility", "computation", "review", "escalation"):
+    for spoke in ("intake", "aggregate_extraction", "eligibility", "computation", "review", "escalation", "resolution_check"):
         g.add_edge(spoke, "orchestrator")
     g.add_edge("finalize", END)
     return g
@@ -117,5 +121,5 @@ def new_return_state(return_id: str, documents: list[dict[str, Any]] | None = No
         "intake": intake or {}, "intake_complete": bool(intake and intake.get("_confirmed")),
         "documents_in": documents or [], "extraction_done": False, "lines": {}, "provenance": {}, "computation_version": 0,
         "review_round": 0, "review_passed": False, "revise_target": None, "loop_guard_tripped": False, "fault_injection": fault_injection or {},
-        "handoffs": [], "mailbox": [], "events": [f"return {return_id} created"],
+        "handoffs": [], "mailbox": [], "hitl_log": [], "blocking_review": None, "human_edit": None, "recompute_stage": None, "resolution_request": None, "events": [f"return {return_id} created"],
     }

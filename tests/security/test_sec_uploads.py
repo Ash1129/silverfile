@@ -7,6 +7,7 @@ no route serves."""
 from __future__ import annotations
 
 import io
+import os
 import zlib
 from pathlib import Path
 
@@ -59,7 +60,7 @@ def _pdf(extra: bytes = b"") -> bytes:
     ("w2.exe", JPEG, "contents are JPEG but its name ends in .exe"),
     ("w2.jpg", b"\xff\xd8\xff\xe0" + b"\x00" * 64, "could not be read"),  # a JPEG header and nothing else
     ("empty.jpg", b"", "empty"),
-])
+], ids=lambda value: f"binary-{len(value)}" if isinstance(value, bytes) else value)
 def test_wrong_types_and_lying_names_are_refused(name, data, why):
     with pytest.raises(uploads.UploadRejected, match=why):
         uploads.check(name, data)
@@ -115,7 +116,8 @@ def test_stored_under_a_random_name_encrypted_and_never_served(web, data_dir):
     assert p.is_relative_to(Path(data_dir) / "uploads") and p.suffix == ".enc" and len(p.stem) == 32
     assert "passwd" not in str(p) and doc["original_name"] == "passwd W2 _1_.jpg"
     assert p.read_bytes()[:3] != b"\xff\xd8\xff" and uploads.read_bytes(p)[:3] == b"\xff\xd8\xff"
-    assert oct(p.stat().st_mode & 0o777) == "0o600"
+    if os.name != "nt":  # Windows chmod does not expose POSIX owner/group permission bits.
+        assert oct(p.stat().st_mode & 0o777) == "0o600"
     c = TestClient(web)
     for url in (f"/static/../uploads/{p.parent.name}/{p.name}", f"/uploads/{p.parent.name}/{p.name}", f"/static/{p.name}"):
         assert c.get(url).status_code == 404
