@@ -70,6 +70,9 @@ def create_app() -> FastAPI:
         ctx.setdefault("can", (lambda perm: bool(me and me.can(perm))))
         ctx.setdefault("csrf", web.csrf_for(request))
         ctx.setdefault("csp_nonce", request.state.csp_nonce)
+        ctx.setdefault("key_ui", gate.key_ui_enabled())  # the header "API key" control
+        ctx.setdefault("gate_on", gate.gate_enabled())
+        ctx.setdefault("key_next", web.safe_next(request.url.path) if request.method == "GET" else "/")  # where the header form returns to
         return templates.TemplateResponse(request, name, ctx, status_code=status_code)
 
     def error(request: Request, status_code: int, title: str, message: str, back: str = "/") -> HTMLResponse:
@@ -137,32 +140,34 @@ def create_app() -> FastAPI:
     async def healthz():
         return Response("ok", media_type="text/plain")
 
-    # ------------------------------------------------------------ key gate (shared copies only; see gate.py)
+    # ------------------------------------------------------------ session API keys (the header control and the optional gate; see gate.py)
     @app.get("/key", response_class=HTMLResponse)
     async def key_page(request: Request):
-        if not gate.gate_enabled():
+        if not gate.key_ui_enabled():
             return RedirectResponse("/", status_code=303)
         return page(request, "key.html")
 
     @app.post("/key")
-    async def key_submit(request: Request, api_key: str = Form("")):
-        if not gate.gate_enabled():
+    async def key_submit(request: Request, api_key: str = Form(""), next: str = Form("/")):
+        if not gate.key_ui_enabled():
             return RedirectResponse("/", status_code=303)
-        await verify_csrf(request)
+        # the header form carries the logged-in session's token, the key page the pre-login one
+        await verify_csrf(request, web.staff(request) or web.taxpayer(request))
+        ratelimit.KEY_CHECK.hit(web.client_ip(request))
         try:
             key = await run_in_threadpool(gate.validate_key, api_key)
         except ValueError as e:
             return page(request, "key.html", status_code=400, error=str(e))
         gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
-        response = RedirectResponse("/", status_code=303)
+        response = RedirectResponse(web.safe_next(next), status_code=303)
         gate.set_session_cookie(response, request, gate.start_session(key))
         return response
 
     @app.post("/key/forget")
-    async def key_forget(request: Request):
+    async def key_forget(request: Request, next: str = Form("/")):
         await verify_csrf(request, web.staff(request) or web.taxpayer(request))
         gate.end_session(request.cookies.get(gate.SESSION_COOKIE))
-        response = RedirectResponse("/key" if gate.gate_enabled() else "/", status_code=303)
+        response = RedirectResponse("/key" if gate.gate_enabled() else web.safe_next(next), status_code=303)
         gate.clear_session_cookie(response)
         return response
 

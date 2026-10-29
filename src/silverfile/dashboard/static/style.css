@@ -119,3 +119,13 @@ ol.bus .detail { font-size: .88rem; color: var(--muted); line-height: 1.4; margi
 .act-violation { background: var(--red-bg); border-color: var(--red); color: var(--red); }
 .bus-warn { color: var(--amber); font-weight: 600; }
 .bus-bad { color: var(--red); font-weight: 600; }
+/* header API key control (classes only: the CSP forbids inline styles) */
+.key-state { color: #c9d1d9; margin-left: 1rem; font-size: .9rem; }
+.keybox { display: inline-block; position: relative; margin-left: 1rem; }
+.keybox summary { cursor: pointer; color: #c9d1d9; list-style: none; text-decoration: underline; }
+.keybox summary::-webkit-details-marker { display: none; }
+.keybox[open] summary { color: #fff; }
+.keybox-form { position: absolute; right: 0; top: 2rem; z-index: 5; width: min(22rem, 86vw); background: var(--card); color: var(--ink); border: 1px solid var(--rule); border-radius: 6px; padding: .9rem 1rem; display: flex; flex-direction: column; gap: .5rem; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.keybox-form input[type=password] { font: inherit; padding: .5rem .6rem; border: 1px solid var(--rule); border-radius: 4px; }
+.keybox-form .button { align-self: flex-start; }
+.keybox-form p { margin: 0; }

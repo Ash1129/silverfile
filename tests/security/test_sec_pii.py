@@ -69,3 +69,16 @@ def test_the_dashboard_view_of_a_return_masks_ssns(data_dir):
     rid = service.create_return([], {"taxpayer": {"first_name": "Eleanor", "last_name": "Whitfield", "ssn": "912-34-5678"}}, actor=auth.system("test"))
     blob = json.dumps(service.state_json(rid))
     assert "912-34-5678" not in blob and "***-**-5678" in blob
+
+
+def test_redaction_keeps_log_arguments_intact_for_formatters_that_unpack_them(caplog):
+    """uvicorn's access log unpacks exactly five arguments; redaction must not flatten them."""
+    from uvicorn.logging import AccessFormatter
+
+    pii.install_log_redaction()
+    with caplog.at_level(logging.INFO, logger="uvicorn.access"):
+        logging.getLogger("uvicorn.access").info('%s - "%s %s HTTP/%s" %d', "127.0.0.1:5000", "GET", "/t?ssn=123-45-6789", "1.1", 200)
+    record = caplog.records[-1]
+    assert len(record.args) == 5 and record.args[4] == 200
+    line = AccessFormatter("%(client_addr)s %(request_line)s %(status_code)s").format(record)
+    assert "GET /t?ssn=[SSN]" in line and "123-45-6789" not in line

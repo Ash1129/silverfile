@@ -9,13 +9,23 @@ A multi-agent preparation aid that turns a short conversation and a handful of u
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt && pip install -e .
-python data/generate_fixtures.py          # synthetic documents and W-2 images
-cp .env.example .env && chmod 600 .env     # add ANTHROPIC_API_KEY to use Claude; blank = offline mode
-python run.py staff add yourname --role admin   # the dashboard needs a staff login (password prompted)
-python run.py serve                        # staff dashboard at http://localhost:8000, taxpayers at /start
+python data/generate_fixtures.py   # synthetic documents and W-2 images
+python run.py setup                # your keys, safely (see below); press Enter to run offline
+python run.py try                  # opens the app with demo logins: ada (admin), pat (preparer), cleo (clerk)
 ```
 
-Staff log in at `/`. A conversation return gives you an access code for the taxpayer; the taxpayer opens it at `/start` (or with the "open the taxpayer's view" button, in a separate session in the same browser). Staff cannot answer for the taxpayer. Set `SILVERFILE_DATA_KEY` in `.env` for anything beyond a local try-out; without it a development key is generated into the data directory. A data directory written before encryption at rest was added cannot be read: delete `data/runtime/` and reseed.
+`run.py try` prints the demo password and opens http://localhost:8000. Staff log in at `/`. Starting a conversation return gives an access code for the taxpayer, who opens it at `/start` (or use the "open the taxpayer's view" button, which opens a separate session). Staff cannot answer for the taxpayer. A data directory written before encryption at rest was added cannot be read: delete `data/runtime/` and run again.
+
+### Your keys
+
+No key is needed to run or grade SilverFile: without one it runs **offline** (scripted intake parser, sidecar extraction, rule-only review) and every number is the same. To run the live Claude models you need your own Anthropic API key from https://platform.claude.com/settings/keys; calls are billed to that key. There are two safe ways to give it:
+
+| | How | Where the key lives |
+| --- | --- | --- |
+| **Save it** | `python run.py setup`, then `python run.py try` | `.env` in this folder: readable by you only (0600) and gitignored, so it cannot be committed. Setup hides what you type, checks the key with Anthropic before saving it, and only ever prints its last four characters. |
+| **Don't save it** | `python run.py try --ask-key` | Nowhere on disk. You paste it into the browser; the server keeps it in memory for your session (12 hours, or until you click *Forget my key*) and never writes it to disk or a log. |
+
+`setup` also generates `SILVERFILE_DATA_KEY`, the key that encrypts saved returns and uploads. It is optional for a local try-out (a development key is generated if it is missing) but **required for Docker**, which refuses to start without it. Setup never replaces a data key that is already set, because a new one would make the saved returns unreadable; back up `.env` if the data matters. To set things by hand instead, copy `.env.example` to `.env`, run `chmod 600 .env` and fill it in; every variable is explained there. Never paste a key into an issue, a commit or a chat.
 
 Other entry points:
 
@@ -28,11 +38,12 @@ Other entry points:
 | `python run.py graph` | Prints the Mermaid diagram of the compiled graph and writes `docs/graph.mmd` |
 | `pytest -q` | The test suite (offline; tax math runs in-process); `pytest -q tests/security` for the security tests alone |
 | `python run.py staff add NAME --role clerk\|preparer\|admin` | Create a staff account (`staff list`, `staff passwd NAME` too) |
-| `python run.py try` | One step to click through it locally: demo staff accounts (ada admin, pat preparer, cleo clerk; password `silverfile-demo-2025`), demo returns, server and browser |
+| `python run.py setup` | Put your Anthropic key (hidden input, checked) and a generated data key into `.env`, readable by you only |
+| `python run.py try [--ask-key]` | One step to click through it locally: demo staff accounts (ada admin, pat preparer, cleo clerk; password `silverfile-demo-2025`), demo returns, server and browser. `--ask-key` asks for the Anthropic key in the browser and never saves it |
 | `python run.py purge [--days N]` | Delete abandoned returns past retention (also runs at start-up) |
 | `python run.py audit` | Verify the security log's hash chain and print recent events |
 | `python evals/run_evals.py` | The eval cases with expected line values and expected escalations |
-| `docker compose up --build` | The same dashboard on port 8000 with sessions in a named volume |
+| `docker compose up --build` | The same dashboard on port 8000 with sessions in a named volume. Run `python run.py setup` first: the container needs `SILVERFILE_DATA_KEY` (and `SILVERFILE_ADMIN_USER` / `SILVERFILE_ADMIN_PASSWORD` in `.env` for the first login) |
 
 **Offline mode.** Without an API key the system still runs end to end: intake answers are parsed by a scripted parser, document images are read from their sidecar JSON, and review uses the rule checks and the independent recomputation only. Every number still comes from the MCP tool server. Online, Claude Haiku parses intake answers, Claude Sonnet reads document images, and Claude Opus audits the draft (the reviewer must be a different model from the worker; if both are set to the same model the reviewer switches to the other one).
 
@@ -40,7 +51,7 @@ Docker could not be run on the development machine (no Docker daemon). The Docke
 
 ### Sharing a demo copy
 
-`render.yaml` deploys the Dockerfile to Render's free tier with no API key of its own. Your `ANTHROPIC_API_KEY` stays in the local `.env`, which is gitignored and never copied into the image. With `SILVERFILE_REQUIRE_KEY=1` (set in the Dockerfile and `render.yaml`) the shared copy asks each visitor for their own Anthropic key before showing anything, checks it with one `models.list` call, keeps it in the server's memory under a random session id (the cookie carries only the id, HttpOnly, 12-hour sliding expiry, *Forget my key* in the header drops it) and runs the live models on it for that visitor's requests only, through the `llm.request_key` context variable. The key is never written to disk or logs and never appears in a page; each visitor's runs are billed to their account. Drop that variable to run the shared copy offline instead (the mode the tests and evals use). Vercel is not a fit: its Python runtime is serverless with no writable disk, and the dashboard keeps sessions and uploads in SQLite and on disk.
+`render.yaml` deploys the Dockerfile to Render's free tier with no API key of its own. Your `ANTHROPIC_API_KEY` stays in the local `.env`, which is gitignored and never copied into the image. With no server key, every page has an **API key** control in the header: a visitor can paste their own Anthropic key to run the live models for their browser session only. The key is checked with one `models.list` call, kept in the server's memory under a random session id (the cookie carries only the id, HttpOnly, 12-hour sliding expiry, *Forget my key* in the header drops it), used through the `llm.request_key` context variable for that visitor's requests only, never written to disk or logs and never shown on a page; each visitor's runs are billed to their account. Until a key is entered the app runs in **offline mode** (scripted intake, the demo documents and rule-based review; the numbers are identical), so a clean run works with no key, but a new document image can only be read by a live model. Set `SILVERFILE_REQUIRE_KEY=1` to make a key mandatory before any page is shown (the earlier full-page gate). Vercel is not a fit: its Python runtime is serverless with no writable disk, and the dashboard keeps sessions and uploads in SQLite and on disk.
 
 The shared copy also needs a staff login: `render.yaml` has Render generate `SILVERFILE_DATA_KEY` and the first admin's password (user `admin`), which the owner reads in Render's dashboard and uses to add accounts for teammates.
 

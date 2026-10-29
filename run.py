@@ -11,7 +11,9 @@
   python run.py staff list | passwd NAME   list accounts, or set a new password (ends that person's sessions)
   python run.py purge [--days N]           delete abandoned returns (unfinished, idle N days; default SILVERFILE_RETENTION_DAYS)
   python run.py audit                      verify the security log's hash chain and print the latest events
-  python run.py try                        one step to try it out locally: demo staff accounts, demo returns, server, browser
+  python run.py setup                      put your own keys in .env safely (hidden input, checked, file readable by you only)
+  python run.py try [--ask-key]            one step to try it out locally: demo staff accounts, demo returns, server, browser
+                                           (--ask-key: paste your Anthropic key in the browser instead; it is never saved)
 """
 from __future__ import annotations
 
@@ -208,6 +210,14 @@ def cmd_audit(args: argparse.Namespace) -> int:
 DEMO_PASSWORD = "silverfile-demo-2025"  # local try-out accounts only; the data directory is gitignored
 
 
+def cmd_setup(args: argparse.Namespace) -> int:
+    import getpass
+
+    from silverfile.keysetup import run_setup
+
+    return run_setup(ask_secret=getpass.getpass, ask=input)
+
+
 def cmd_try(args: argparse.Namespace) -> int:
     """Everything needed to click through the app (and try to break it) in one command."""
     import os
@@ -225,8 +235,20 @@ def cmd_try(args: argparse.Namespace) -> int:
         except ValueError:
             pass  # already there
     os.environ["SILVERFILE_SEED_DEMO"] = "1"
+    from silverfile.keysetup import masked
+
+    if args.ask_key:
+        # the key gate: the browser asks for the key, the server keeps it in memory only (dashboard/gate.py)
+        os.environ.pop("ANTHROPIC_API_KEY", None)
+        os.environ["SILVERFILE_REQUIRE_KEY"] = "1"
+        mode = "live models, with the key you paste in the browser (kept in memory only, never saved)"
+    elif os.environ.get("ANTHROPIC_API_KEY"):
+        mode = f"live models, with the key in .env ending {masked(os.environ['ANTHROPIC_API_KEY'])}"
+    else:
+        mode = "offline (no API key). To use Claude: `python run.py setup`, or `python run.py try --ask-key`"
     url = f"http://localhost:{args.port}"
     print(f"\nSilverFile at {url}  (Ctrl+C to stop)")
+    print(f"Mode: {mode}")
     print(f"Staff logins, password {DEMO_PASSWORD}: ada (admin), pat (preparer), cleo (clerk)")
     print(f"Taxpayer: log in as pat, start a return, then open {url}/start in a private window with the access code\n")
     if not args.no_browser:
@@ -256,7 +278,8 @@ def main() -> int:
     s = sub.add_parser("graph"); s.set_defaults(fn=cmd_graph)
     s = sub.add_parser("staff"); s.add_argument("action", choices=["add", "list", "passwd"]); s.add_argument("name", nargs="?"); s.add_argument("--role", default="preparer", choices=["clerk", "preparer", "admin"]); s.set_defaults(fn=cmd_staff)
     s = sub.add_parser("purge"); s.add_argument("--days", type=int); s.add_argument("--include-finished", action="store_true"); s.set_defaults(fn=cmd_purge)
-    s = sub.add_parser("try"); s.add_argument("--port", type=int, default=8000); s.add_argument("--no-browser", action="store_true"); s.set_defaults(fn=cmd_try)
+    s = sub.add_parser("setup"); s.set_defaults(fn=cmd_setup)
+    s = sub.add_parser("try"); s.add_argument("--port", type=int, default=8000); s.add_argument("--no-browser", action="store_true"); s.add_argument("--ask-key", action="store_true", help="paste the Anthropic key in the browser; it is kept in memory only"); s.set_defaults(fn=cmd_try)
     s = sub.add_parser("audit"); s.add_argument("--last", type=int, default=20); s.set_defaults(fn=cmd_audit)
     args = ap.parse_args()
     return args.fn(args)
