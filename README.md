@@ -141,7 +141,7 @@ src/silverfile/
   agents/             orchestrator, intake, extraction, eligibility, computation, review, escalation
   tax_math/           rules.py (pure functions), server.py (MCP), client.py (stdio client + call log)
   provenance.py       the per-line record
-  memory.py           session summary; ContextWindow (section 4.5)
+  memory.py           session summary, resume recap, answer history; ContextWindow (section 4.5)
   batch.py            the ten-document measurement
   service.py          session store and the dashboard's operations (authorization, security diff)
   security/           pii, crypto, uploads, validate, injection, integrity, audit, auth, ratelimit, retention, capabilities
@@ -149,7 +149,7 @@ src/silverfile/
   forms/render.py     draft 1040-SR as HTML (and PDF)
 data/fixtures/        synthetic cases and the batch W-2 images (generated)
 demo/                 the two walkthroughs and the synthetic W-2 images
-docs/                 graph.png, metrics.md, THREAT_MODEL.md, IMPLEMENTATION_NOTES.md, AI_DISCLOSURE.md, blueprint/ (the design-stage run)
+docs/                 graph.png, metrics.md, AGENT_MEMORY.md, THREAT_MODEL.md, IMPLEMENTATION_NOTES.md, AI_DISCLOSURE.md, blueprint/ (the design-stage run)
 evals/                cases.json + run_evals.py
 tests/                pytest suite; tests/security/ the security tests
 traces/               sample runs (events, provenance, token log)
