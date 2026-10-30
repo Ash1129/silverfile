@@ -104,6 +104,7 @@ Every one of these produces an `Escalation` record with a reason and a rulebook 
 | `out_of_scope` | A declared or uploaded document type, or an income source, is outside W-2, SSA-1099, 1099-R, 1099-INT, 1099-DIV | Eligibility |
 | `eligibility` | Nobody on the return was born before 2 January 1961 | Eligibility |
 | `chart_not_applicable` | The Standard Deduction Chart does not apply (dependent of another, MFS with itemising spouse, dual-status) | Eligibility |
+| `uncertain_fact` | A required fact is unconfirmed, including dual-status residency or an MFS spouse's itemised deductions | Intake, Eligibility, Computation |
 | `conflict` | A document disagrees with what the taxpayer said (a form not declared, a declared form missing, a name mismatch), or the taxpayer cannot answer something the return needs | Eligibility, Intake |
 | `r_box2b` | A 1099-R has box 2b "taxable amount not determined" checked | Eligibility |
 | `advice` | The taxpayer asks what they *should* do | Intake |
@@ -113,6 +114,10 @@ Every one of these produces an `Escalation` record with a reason and a rulebook 
 | `loop_guard` | See above | Orchestrator |
 
 A staff action is submitted through the dashboard; the resolver and role come from the logged-in session and fact patches are schema-checked. Every `continue` runs a deterministic `resolution_check` that records `yes` or `no` with structured required actions. A failed check retains the open escalation. `start_edit` and `save_edit` keep a checkpointed human edit in progress; `complete_edit` (or Continue with a patch) completes it, invalidates old numbers and provenance, and queues eligibility, one computation and review when the required intake and documents are available. `halt` hands the return to a preparer.
+
+Source-linked monetary claims are reconciled with extracted boxes before calculation. A preparer can inspect the original source and submit an evidence-backed, version-checked transcription correction in the dashboard. Extraction applies the work order, preserving the original upload and audit history, before eligibility, recomputation and review. Identical-source duplicates require explicit disposition; unrelated documents are not merged. Details, integration boundaries and acceptance steps are in [docs/EVIDENCE_REVIEW.md](docs/EVIDENCE_REVIEW.md).
+
+Deduction-chart facts require explicit confirmation: `dual_status_alien` for every return and `mfs_spouse_itemizes` only for married filing separately. Missing or null answers block calculation; they are never defaulted to false. Active intake questions for these two facts are pending integration. Until then, a new conversation pauses for staff confirmation after intake, while the prefilled demo fixtures contain explicit synthetic answers. The field contract and staff resolution example are in `docs/INTAKE_DIGNITY.md`.
 
 An unresolved review creates a separate **blocking review event**. Accept stays blocked until the listed corrections and recheck pass, a staff member explicitly selects **Resolve blocking review event**, and a nonempty intervention explanation is saved to the structured log with **Save intervention explanation**. The explanation has no application character limit; long text is saved in ordered, bounded chunks while the existing HTTP body cap and staff rate limit remain in force. Changing the explanation requires saving it again. Only then is **Accept** enabled. Starting another edit reopens the event and invalidates the saved explanation. The dashboard exposes the workflow and `/returns/<id>/hitl.json`; the same records are mirrored to the tamper-evident security log. Unknown required amounts and checkbox values remain unknown instead of becoming zero or false, and are sent to a person when necessary.
 

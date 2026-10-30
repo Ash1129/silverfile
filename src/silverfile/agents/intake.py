@@ -35,7 +35,7 @@ ADVICE_RE = re.compile(
     r"would it help|which (?:one |status |option )?(?:is|would be) (?:better|cheaper)|how (?:can|do) (?:i|we) (?:pay|owe) less|"
     r"roth|convert my ira|save on tax|lower my tax|reduce my tax|minimi[sz]e my tax|write off|claim .* deduction|file separately to)\b", re.I)
 GO_BACK_RE = re.compile(r"\b(go back|change|correct|fix|actually|i meant|earlier i said|wrong)\b", re.I)
-UNSURE_RE = re.compile(r"\b(not sure|not certain|don't know|dont know|no idea|unsure|uncertain|unknown|maybe|probably|i think|can't tell|cannot tell|unreadable|can't remember|cannot remember|i forget)\b", re.I)
+UNSURE_RE = re.compile(r"\b(not sure|not certain|don['’]?t know|do not know|no idea|unsure|uncertain|unknown|maybe|probably|i think|can['’]t tell|cannot tell|unreadable|can['’]t remember|cannot remember|i forget|cannot say)\b", re.I)
 
 # Guardrails B: who is answering. Brief §4.4 condition 6 is "a third party answering on the
 # taxpayer's behalf without a stated authority". The trigger is someone *acting for* the
@@ -58,6 +58,13 @@ THIRD_PARTY_RE = re.compile(
     rf"|\bmy {NON_SPOUSE}'s (?:return|taxes)\b",
     re.I)
 AUTHORITY_RE = re.compile(r"\b(power of attorney|poa|authori[sz]ed|permission|form 2848|guardian|conservator)\b", re.I)
+NO_AUTHORITY_RE = re.compile(r"\b(?:without|no|not|never|don't|do not|doesn't|does not|haven't|have not|hasn't|has not|need|awaiting|pending|lack|lacking)\b.{0,65}\b(?:permission|authori[sz](?:ed|ation|ity)|power of attorney|poa|form 2848|guardian|conservator)\b|\b(?:permission|authority|authorization|authorisation)\b.{0,30}\b(?:denied|refused|revoked|expired|not granted|pending)\b", re.I)
+
+
+def stated_authority(text: str) -> bool:
+    """A positive authority claim, never a negated or uncertain mention of it."""
+    text = text.replace("\u2019", "'")
+    return bool(AUTHORITY_RE.search(text)) and not bool(NO_AUTHORITY_RE.search(text) or UNSURE_RE.search(text))
 MENTIONS_OTHER_RE = re.compile(rf"\b{RELATIVE}\b|\bpower of attorney\b|\bpoa\b", re.I)
 DOC_KINDS = {"W-2": ["w-2", "w2", "wage"], "SSA-1099": ["ssa", "social security"], "1099-R": ["1099-r", "1099r", "pension", "annuity", "ira distribution", "retirement"], "1099-INT": ["1099-int", "1099int", "interest"], "1099-DIV": ["1099-div", "1099div", "dividend"], "1099-NEC": ["1099-nec", "nec", "contractor"], "1099-B": ["1099-b", "brokerage", "stock sale"], "1099-MISC": ["1099-misc", "misc"], "K-1": ["k-1", "k1"]}
 FILING_WORDS = {"single": ["single"], "mfj": ["jointly", "joint", "married filing jointly", "mfj", "together"], "mfs": ["separately", "mfs", "separate"], "hoh": ["head of household", "hoh"], "qss": ["surviving spouse", "qualifying widow", "widower", "qss"]}
@@ -127,7 +134,7 @@ def _q(slot: str, facts: IntakeFacts) -> str:
         "other_income": "Did you have any other income in 2025 that isn't on one of those forms? For example from a business or freelance work, renting out property, selling investments or cryptocurrency, or from outside the United States. Say no, or describe it briefly.",
         "estimated_payments": "In total, how much did you send the IRS in estimated tax payments during 2025? Many people sent none, and 'none' is a fine answer.",
         "schedule1_adjustments": "What is the total of any adjustments to income you have to report? If you have none, just say none.",
-        "schedule1_other_income": "Did a preparer give you an amount for 'additional income' on Schedule 1? If you don't know what that is, say none.",
+        "schedule1_other_income": "Did a preparer give you an amount for 'additional income' on Schedule 1? If there is no amount, say none. If you're unsure, say you don't know.",
         "schedule2_line3": "Did a preparer give you an amount for additional taxes on Schedule 2? If not, say none.",
         "schedule3_line8": "Did a preparer give you an amount for credits on Schedule 3? If not, say none.",
         "refund_account": "If you're due a refund, where should it go? Describe the account in your own words, for example 'my checking account at First Bank'.",
@@ -243,19 +250,28 @@ def parse_date(s: str) -> str | None:
 def parse_money(s: str) -> float | None:
     if UNSURE_RE.search(s):
         return None
+    amounts = re.findall(r"\$?\s*(\d[\d,]*(?:\.\d{1,2})?)", s)
     if re.search(r"\b(none|no|nothing|zero|didn't|did not|nope)\b", s, re.I):
-        return 0.0
-    m = re.search(r"\$?\s*([\d,]+(?:\.\d{1,2})?)", s)
-    return float(m.group(1).replace(",", "")) if m else None
+        return 0.0 if not amounts or all(float(a.replace(',', '')) == 0 for a in amounts) else None
+    if len(amounts) != 1 or re.search(r"-\s*\$?\s*\d", s):
+        return None
+    return float(amounts[0].replace(",", ""))
 
 
 def parse_yes_no(s: str) -> bool | None:
     if UNSURE_RE.search(s):
         return None
-    if re.search(r"\b(yes|yeah|yep|correct|i am|that's right|right|true|sure)\b", s, re.I):
-        return True
-    if re.search(r"\b(no|nope|not|never|false|none)\b", s, re.I):
+    s = s.replace("\u2019", "'")
+    negative = re.search(r"\b(no|nope|not|never|false|none|isn't|aren't|wasn't|weren't|don't|doesn't|didn't|can't|cannot)\b", s, re.I)
+    affirmative = re.search(r"\b(yes|yeah|yep|correct|i am|that's right|right|true|sure)\b", s, re.I)
+    # Conflicting explicit answers need clarification. A negative clause such as
+    # 'I am not blind' is not a positive answer merely because it contains 'I am'.
+    if negative and re.search(r"\b(yes|yeah|yep|true)\b", s, re.I):
+        return None
+    if negative:
         return False
+    if affirmative:
+        return True
     return None
 
 
@@ -265,6 +281,11 @@ def parse_doc_kinds(s: str) -> list[str]:
 
 
 NO_MORE_RE = re.compile(r"\b(none|no one|nobody|no more|no other|nobody else|that's (?:all|everyone|it)|that is (?:all|everyone|it)|(?:don't|do not) have (?:any|one))\b", re.I)
+
+
+def no_other_income(text: str) -> bool:
+    """A complete negative answer, not a negative clause hiding other income."""
+    return bool(re.fullmatch(r"\s*(?:no|nope|none|nothing|no other income|none at all|no additional income|i (?:have|had) no other income|i (?:don't|do not|didn't|did not) have any other income)[.!\s]*", text.replace("\u2019", "'"), re.I))
 
 
 def answering_party_from(text: str) -> dict[str, Any]:
@@ -277,7 +298,7 @@ def answering_party_from(text: str) -> dict[str, Any]:
     """
     yn = parse_yes_no(text)
     if THIRD_PARTY_RE.search(text) or yn is False or (MENTIONS_OTHER_RE.search(text) and yn is not True):
-        auth = bool(AUTHORITY_RE.search(text))
+        auth = stated_authority(text)
         return {"answering_party": "third_party_with_authority" if auth else "third_party_no_authority", "third_party_authority": text}
     return {"answering_party": "self"}
 
@@ -319,7 +340,7 @@ def scripted_parse(slot: str, text: str, facts: IntakeFacts) -> dict[str, Any]:
     elif slot == "documents_declared":
         up["kinds"] = parse_doc_kinds(t)
     elif slot == "other_income":
-        up["other"] = [] if parse_yes_no(t) is False and len(t) < 40 else [t]
+        up["other"] = [] if no_other_income(t) else [t]
     elif slot in ("estimated_payments", "schedule1_adjustments", "schedule1_other_income", "schedule2_line3", "schedule3_line8"):
         up["amount"] = parse_money(t)
     elif slot == "refund_account":
@@ -479,14 +500,24 @@ UNCERTAIN_SLOTS = {
     "estimated_payments": "estimated_payments", "schedule1_adjustments": "schedule1_adjustments",
     "schedule1_other_income": "schedule1_other_income", "schedule2_line3": "schedule2_line3",
     "schedule3_line8": "schedule3_line8", "refund_account_is_own": "refund_account_is_own",
+    "other_income": "other_income_sources", "documents_declared": "documents_declared",
+    "more_dependents": "dependents", "spouse_died_in_year": "spouse_died_in_year",
+    "mfs_spouse_itemizes": "mfs_spouse_itemizes", "dual_status_alien": "dual_status_alien",
 }
 
 
 def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str]) -> IntakeFacts:
     f: IntakeFacts = json.loads(json.dumps(facts))  # deep copy; TypedDict is a plain dict
+    text_answer = parse_yes_no(str(parsed.get("_text") or ""))
     if UNSURE_RE.search(str(parsed.get("_text") or "")):
         # A model's confident parse cannot override uncertainty in the actual answer.
         parsed = {**parsed, "intent": "unsure", "updates": {}, "also": {}}
+    elif slot in YES_NO_SLOTS and text_answer is not None:
+        parsed = {**parsed, "intent": "answer", "updates": {"value": text_answer}}
+    elif slot in YES_NO_SLOTS and re.search(r"\b(yes|yeah|yep|true)\b", str(parsed.get("_text") or ""), re.I) and re.search(r"\b(no|not|never|false)\b", str(parsed.get("_text") or ""), re.I):
+        parsed = {**parsed, "intent": "unsure", "updates": {}}
+    elif slot in MONEY_SLOTS and parsed.get("_text") and parse_money(str(parsed["_text"])) is None:
+        parsed = {**parsed, "intent": "unsure", "updates": {}}
     up = parsed.get("updates") or {}
     tp = f.setdefault("taxpayer", {})
     sp = f.get("spouse") or {}
@@ -495,7 +526,7 @@ def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str
         if "." in uncertain_key:
             person, field = uncertain_key.split(".")
             f[person] = {**(f.get(person) or {}), field: None}
-        else:
+        elif slot != "more_dependents":
             f[uncertain_key] = None
         f["_unknown_fields"] = sorted({*(f.get("_unknown_fields") or []), uncertain_key})
         reply.append("I have recorded that as unknown, not as no or zero. A Kushim preparer must confirm it before we continue.")
@@ -587,7 +618,8 @@ def apply(slot: str, parsed: dict[str, Any], facts: IntakeFacts, reply: list[str
         if not f["documents_declared"]:
             reply.append("I didn't recognise a form name. That's all right; you can upload whatever you have in a moment.")
     elif slot == "other_income":
-        f["other_income_sources"] = up.get("other") or []
+        text = parsed.get("_text")
+        f["other_income_sources"] = ([] if no_other_income(text) else [text]) if text else (up.get("other") or [])
     elif slot in ("estimated_payments", "schedule1_adjustments", "schedule1_other_income", "schedule2_line3", "schedule3_line8"):
         amt = up.get("amount")
         if amt is None and parsed.get("intent") == "unsure":
@@ -699,7 +731,7 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
         return _finish(state, facts, slot, question, said, reply, turns, escalations, events, tokens_in, tokens_out, repeat=True)
     if THIRD_PARTY_RE.search(text) and facts.get("answering_party") == "self" and slot != "answering_party":
         facts["third_party_authority"] = text
-        if AUTHORITY_RE.search(text):
+        if stated_authority(text):
             # someone else has taken over but says they are authorised: noted for the preparer to check, not a pause
             facts["answering_party"] = "third_party_with_authority"
             facts.setdefault("noted_questions", []).append(f"Someone else began answering mid-conversation and stated an authority: {text.strip()[:200]!r}. Please see the paperwork.")
@@ -730,7 +762,7 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
     if slot == "answering_party":
         # whichever parser read it, a stated third party is never taken as "self"
         cautious = answering_party_from(text)
-        if cautious["answering_party"] != "self" and (parsed.get("updates") or {}).get("answering_party") in (None, "self"):
+        if cautious["answering_party"] != "self" and (cautious["answering_party"] == "third_party_no_authority" or (parsed.get("updates") or {}).get("answering_party") in (None, "self")):
             parsed.setdefault("updates", {}).update(cautious)
     if UNSURE_RE.search(text) and parsed.get("intent") == "answer":
         parsed["intent"] = "unsure"
@@ -752,6 +784,15 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
     unknown = validate.unknown_fact_actions({"intake": facts})
     if unknown and not any(e.get("kind") == "uncertain_fact" and e.get("status") == "open" for e in state.get("escalations", [])):
         escalations.append(Escalation(id=f"esc-unknown-{slot}", kind="uncertain_fact", reason="A required fact is unknown and must not be treated as no or zero.", raised_by="intake", raised_at=now_iso(), details={"required_actions": unknown, "citation": "REF-ES-1"}, status="open", resolution=None, resolved_by=None, resolved_at=None))
+    if slot not in SSN_SLOTS and not UNSURE_RE.search(text):
+        # Keep supplementary claims separate from apply() and its answer-history hook.
+        claim_match = re.search(r"\bW-?2\s+(?:wages|box\s*1)\s*(?:(?:were|was|are|is|of)\s*)?[:=]?\s*\$?([\d,]+(?:\.\d{1,2})?)", text, re.I)
+        if claim_match:
+            amount = validate.money(claim_match.group(1))
+            if amount is not None and 0 <= amount <= validate.MAX_AMOUNT:
+                claim = {"kind": "W-2", "field": "wages", "value": amount}
+                if claim not in (facts.get("document_claims") or []):
+                    facts["document_claims"] = [*(facts.get("document_claims") or []), claim]
     docs_update = {}
     if slot == "upload" and new_docs:
         docs_update = {"documents_in": [*state.get("documents_in", []), *new_docs]}

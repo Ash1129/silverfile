@@ -1,0 +1,42 @@
+{% if evidence_conflicts %}
+<section class="card">
+  <h2>Conflicting evidence</h2>
+  <p>These conflicts block computation and continuation until the current sources agree.</p>
+  {% for conflict in evidence_conflicts %}
+  <details open><summary>{{ conflict.summary | mask }}</summary><pre>{{ conflict | pretty | mask }}</pre></details>
+  {% endfor %}
+  <p class="muted small">A confirmed statement can be recorded in Facts JSON as <code>{"document_claims":[{"document_id":"w2-1","kind":"W-2","field":"wages","value":35000}]}</code>. Claims are comparisons, not replacement return amounts. A claim correction also needs an evidence explanation in the action note.</p>
+</section>
+{% endif %}
+{% if pending and pending.type == "escalation" and can("resolve_escalation") and active_documents %}
+<section class="card">
+  <h2>Document transcription review</h2>
+  <p>The original source stays unchanged. An evidence-backed correction is applied by Extraction, followed by eligibility, recomputation and review. A genuine out-of-scope case still needs a preparer handoff.</p>
+  {% if document_error %}<p role="alert" class="error">{{ document_error }}</p>{% endif %}
+  {% for id, doc in active_documents.items() %}
+  <details{% if document_values.document_id == id %} open{% endif %}>
+    <summary>{{ id }} · {{ doc.kind }} · version {{ doc.version }}</summary>
+    <p><a href="/returns/{{ rid }}/documents/{{ id | urlencode }}/source">Download original source</a></p>
+    <pre>{{ doc.fields | pretty | mask }}</pre>
+    <details><summary>Allowed fields and source boxes</summary><pre>{{ doc.boxes | pretty | mask }}</pre></details>
+    <form method="post" action="/returns/{{ rid }}/document-correction" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <input type="hidden" name="interrupt_id" value="{{ pending_id }}">
+      <input type="hidden" name="document_id" value="{{ id }}">
+      <input type="hidden" name="expected_version" value="{{ doc.version }}">
+      <label>Corrected source fields (JSON object)
+        <textarea name="fields_json" rows="4" spellcheck="false">{{ document_values.fields_json if document_values.document_id == id else '{}' }}</textarea>
+      </label>
+      <label>Evidence explanation: original source, boxes and reason
+        <textarea name="evidence" rows="3" required maxlength="4000">{{ document_values.evidence if document_values.document_id == id else '' }}</textarea>
+      </label>
+      <label>Identical-source duplicate only: retained document ID (optional)
+        <input name="superseded_by" value="{{ document_values.superseded_by if document_values.document_id == id else '' }}">
+      </label>
+      <p class="muted small">Duplicate disposition uses an empty fields object and requires another copy of the identical physical source. Different forms from the same payer remain separate.</p>
+      <button class="button" type="submit">Apply evidence-backed correction and recheck</button>
+    </form>
+  </details>
+  {% endfor %}
+</section>
+{% endif %}

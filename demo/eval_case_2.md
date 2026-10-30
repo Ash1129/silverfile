@@ -17,9 +17,9 @@ PAUSED for a Kushim employee: [filing_status] A spouse died during the tax year.
 Filing status (married filing jointly, qualifying surviving spouse or single) must be decided by a Kushim employee.
 ```
 
-Nothing has been computed yet: Computation never runs on an unresolved filing status. The thread is checkpointed; you can close the terminal and the dashboard will still show the item in its queue.
+Nothing has been computed yet: Computation never runs on an unresolved filing status. This CLI demo uses an in-memory checkpointer and a new return ID on each invocation. Its pause and resolution happen within the same process; closing the terminal loses that demo thread. Running the command again starts a new demo, rather than resuming the previous one.
 
-In the dashboard the same return appears under **Needs a person** with the reason, the rulebook citation (REF-ES-1), the facts the decision depends on (marriage, date of death, no dependents) and the conversation so far.
+For a persistent dashboard demonstration, start the dashboard separately and open its seeded case 2 under **Needs a person**, or create a return using the case 2 fixture. The dashboard service uses encrypted SQLite checkpoints. It shows the reason, citation (REF-ES-1), relevant facts and available conversation; the prefilled fixture has no intake conversation. A CLI demo thread does not automatically appear in that queue.
 
 ## 2. Resolve it
 
@@ -29,7 +29,9 @@ Pick the status and continue. On the command line:
 python run.py demo case2_hitl --resolve '{"action":"continue","resolved_by":"preparer","note":"Spouse died 2025-05; MFJ allowed for the year of death","facts_patch":{"filing_status":"mfj"}}'
 ```
 
-In the dashboard: open the item, choose **Continue with a change**, set filing status to *Married filing jointly*, add the note, submit. The resume is a `Command(resume=...)` into the same thread; the orchestrator re-runs Eligibility with the patched facts and carries on.
+In the dashboard: open the persistent case 2 item, set filing status to *Married filing jointly*, add the evidence note, and select **Continue and verify**. The resume is a `Command(resume=...)` into that dashboard thread. Completing the correction invalidates stale calculations, checks eligibility, computes once, runs review, and records a deterministic continuation result of `yes` or `no`. A negative result keeps the return paused with the remaining actions.
+
+The prefilled case 2 fixture explicitly confirms `dual_status_alien=false`; spouse itemising is not applicable to MFJ. In a fresh conversation, the deduction-chart questions are still awaiting intake integration. Staff can confirm missing chart facts through Facts JSON after checking the evidence; they are not silently defaulted to false.
 
 Other valid resolutions: `{"action":"halt","note":"..."}` ends the return with the reason on the dashboard (for instance, if the preparer wants to take it over by hand); a `facts_patch` of `{"filing_status":"single"}` is accepted too and produces a different draft.
 
@@ -50,4 +52,4 @@ Eligibility now reports MFJ with **three boxes on line 12d** (taxpayer 65+, taxp
 | 25d withholding | 4,000.00 | 1099-R 2,800 + SSA 1,200 |
 | 34 refund | 4,000.00 | |
 
-The escalation record stays on the return with the resolution, who made it, when, and the note, and the handoff log shows `eligibility → escalation → eligibility → computation → review → finalize`. The eval `spouse_died_mfj` pins these numbers; `tests/test_escalations.py` covers the pause, the patch, the halt path, and the box count.
+The escalation record stays on the return with the resolution, who made it, when, and the note. Omitting the hub between workers, the recovery path is `eligibility → escalation → eligibility → computation → review → resolution_check → finalize`. The eval `spouse_died_mfj` pins these numbers; `tests/test_escalations.py` covers the pause, the patch, the halt path, and the box count. Blocking-review cases have an additional explicit resolve-event, save-explanation and Accept sequence; case 2 is a filing-status escalation and does not use Accept.

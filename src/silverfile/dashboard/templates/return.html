@@ -101,6 +101,7 @@
     </section>
     {% endif %}
 
+    {% include "document_review.html" %}
     {% if state.blocking_review or state.human_edit or state.hitl_log %}
     <section class="card">
       <h2>Human review workflow</h2>

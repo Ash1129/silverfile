@@ -30,4 +30,6 @@ No real taxpayer data was used at any point. All SSNs are in the 900 test series
 
 ## Codex-assisted HITL revision
 
+**Guardrails A follow-up.** The subsequent revision used Codex to implement deterministic source-linked monetary reconciliation, authenticated and version-checked transcription work orders, original-source inspection, duplicate-source disposition, and negation and uncertainty regressions. The agent retained the existing local R01 backend and Python-version-independent form assertions. Testing used synthetic fixtures and disabled live model calls; model-assisted parsing tests use controlled stubs. The user completed the manual acceptance workflow and authorized commit and push afterward. Human review of original documents remains necessary, and broader natural-language coverage is not claimed.
+
 The explicit blocking-review, human-edit completion, deterministic continuation check and unknown-fact controls were implemented with Codex from the human-specified requirements. Verification used the offline pytest suite, ten existing evaluation cases, a bounded long-note transfer check and synthetic preview data. The working files, environments and validation logs are kept in the Git-ignored `agent_workspace/` directory. No real taxpayer data was used, and no commit was created by the agent.

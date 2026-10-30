@@ -37,11 +37,14 @@ from .comms import communicating, communicating_branch
 from .config import settings
 from .provenance import now_iso
 from .security import crypto, integrity
-from .security.validate import provenance_problems
+from .security.validate import provenance_problems, unknown_fact_actions
 from .state import ReturnState
+from .reconciliation import evidence_conflicts
 
 
 def finalize_node(state: ReturnState) -> dict[str, Any]:
+    if evidence_conflicts(state):
+        return {"status": "halted", "halted_reason": "Conflicting evidence has not been resolved.", "handoffs": ["finalize"], "events": ["finalize: blocked by conflicting evidence"]}
     event = state.get("blocking_review")
     if state.get("recompute_stage") or (state.get("human_edit") or {}).get("status") in ("editing", "completed", "blocked") or (event and accept_requirements(state)):
         return {"status": "halted", "halted_reason": "Human review or fact editing has not completed its required actions.", "handoffs": ["finalize"], "events": ["finalize: blocked by incomplete human review"]}
@@ -50,6 +53,8 @@ def finalize_node(state: ReturnState) -> dict[str, Any]:
     elig = state.get("eligibility") or {}
     if not elig.get("eligible_1040sr") or not elig.get("in_scope") or not elig.get("chart_applies", True):
         return {"status": "halted", "halted_reason": "not eligible or out of scope; a Kushim preparer takes it from here", "handoffs": ["finalize"], "events": ["finalize: halted (eligibility/scope)"]}
+    if unknown_fact_actions(state, require_chart_facts=True):
+        return {"status": "halted", "halted_reason": "Required facts remain unknown; a Kushim preparer must confirm them.", "handoffs": ["finalize"], "events": ["finalize: blocked by unknown facts"]}
     # the last structural gate: no draft completes with an amount that is not sourced, whoever accepted it
     unsourced = provenance_problems(state)
     if unsourced:

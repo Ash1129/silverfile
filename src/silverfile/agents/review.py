@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from ..reconciliation import active_documents, evidence_conflicts
 
 from .. import llm
 from ..config import settings
@@ -68,12 +69,14 @@ def rule_checks(state: ReturnState) -> tuple[list[Finding], dict[str, float]]:
     lines = state.get("lines") or {}
     prov = state.get("provenance") or {}
     elig = state.get("eligibility") or {}
-    docs = state.get("extracted") or {}
+    docs = active_documents(state)
     fs = elig.get("filing_status") or (state.get("intake") or {}).get("filing_status") or "single"
     findings: list[Finding] = []
 
     if not lines:
         return [_f("high", "no-computation", "No lines have been computed yet.")], {}
+    for conflict in evidence_conflicts(state):
+        findings.append(_f("high", "evidence-conflict", conflict["summary"], send_to="human", fixable=False))
 
     # 1. provenance for every monetary line, and agreement with the line value
     for line in REQUIRED_LINES:

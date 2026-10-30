@@ -34,6 +34,7 @@ from ..comms.bus import digest
 from ..forms.render import jinja_env, mask_ssn_deep, render_html, render_pdf, status_label
 from ..memory import session_summary
 from ..agents.escalation import accept_requirements
+from ..reconciliation import active_documents, evidence_conflicts
 from ..security import audit, auth, integrity, pii, ratelimit, retention, uploads
 from ..security.pii import install_log_redaction
 from . import gate, web
@@ -246,7 +247,7 @@ def create_app() -> FastAPI:
             audit.record("access_code_issued", actor=me.label, return_id=rid)
         return page(request, "created.html", rid=rid, code=code, fixture=fixture, anon_csrf=request.state.anon_csrf)
 
-    async def render_return(request: Request, rid: str, *, status_code: int = 200, form_values: dict[str, str] | None = None, facts_patch_error: str | None = None):
+    async def render_return(request: Request, rid: str, *, status_code: int = 200, form_values: dict[str, str] | None = None, facts_patch_error: str | None = None, document_values: dict[str, str] | None = None, document_error: str | None = None):
         me = require_staff(request, "view_return")
         check_return_id(rid)
         state = await run_in_threadpool(service.get_state, rid)
@@ -258,10 +259,11 @@ def create_app() -> FastAPI:
             transcript=service.transcript_from_state(state), summary=session_summary(state), open_escalations=open_esc,
             escalation=(pend.get("escalation") if pend and pend.get("type") == "escalation" else (open_esc[0] if open_esc else None)),
             documents_in=state.get("documents_in") or [], filing_statuses=FILING_STATUSES,
-            auto_refresh=state.get("status") in BUSY_STATUSES and not facts_patch_error, busy=BUSY_STATUSES, status_text=status_label(state.get("status")),
+            auto_refresh=state.get("status") in BUSY_STATUSES and not facts_patch_error and not document_error, busy=BUSY_STATUSES, status_text=status_label(state.get("status")),
             hop_chain=_compress_hops(state.get("handoffs") or []), seal=integrity.verify(state), bus=digest(state),
             security_events=audit.recent(20, return_id=rid) if me.can("view_audit") else [],
             accept_requirements=accept_requirements(state), form_values=form_values or {}, facts_patch_error=facts_patch_error,
+            evidence_conflicts=evidence_conflicts(state), active_documents=active_documents(state), document_values=document_values or {}, document_error=document_error,
         )
 
     @app.get("/returns/{rid}", response_class=HTMLResponse)
@@ -274,7 +276,41 @@ def create_app() -> FastAPI:
         check_return_id(rid)
         state = await run_in_threadpool(service.get_state, rid)
         return JSONResponse(pii.redact_deep({"blocking_review": state.get("blocking_review"), "human_edit": state.get("human_edit"),
-                                           "required_actions": accept_requirements(state), "recompute_stage": state.get("recompute_stage"), "log": state.get("hitl_log") or []}))
+                                           "required_actions": accept_requirements(state), "evidence_conflicts": evidence_conflicts(state), "recompute_stage": state.get("recompute_stage"), "log": state.get("hitl_log") or []}))
+
+    @app.get("/returns/{rid}/documents/{document_id}/source")
+    async def source_document(request: Request, rid: str, document_id: str):
+        me = require_staff(request, "resolve_escalation")
+        check_return_id(rid)
+        content, media = await run_in_threadpool(lambda: service.original_document(rid, document_id, actor=me))
+        extension = {"image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf", "application/json": "json"}[media]
+        return Response(content, media_type=media, headers={"Content-Disposition": f'attachment; filename="original-source.{extension}"', "Cache-Control": "no-store"})
+
+    @app.post("/returns/{rid}/document-correction")
+    async def correct_document(request: Request, rid: str, document_id: str = Form(""), expected_version: str = Form(""), fields_json: str = Form("{}"), evidence: str = Form(""), superseded_by: str = Form(""), interrupt_id: str = Form("")):
+        me = require_staff(request, "resolve_escalation")
+        check_return_id(rid)
+        await verify_csrf(request, me)
+        ratelimit.STAFF_WRITE.hit(me.subject)
+        try:
+            try:
+                fields = json.loads(fields_json)
+            except json.JSONDecodeError as exc:
+                raise service.FactsPatchError(f"Invalid document JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}.") from exc
+            try:
+                version = int(expected_version)
+            except ValueError as exc:
+                raise service.FactsPatchError("The document version must be an integer. Reload the current return.") from exc
+            correction = {"document_id": document_id, "expected_version": version, "fields": fields, "evidence": evidence}
+            if superseded_by.strip():
+                correction["superseded_by"] = superseded_by.strip()
+            await run_in_threadpool(lambda: service.resolve(rid, {"action": "correct_document", "document_patch": correction}, actor=me, interrupt_id=interrupt_id))
+        except service.FactsPatchError as exc:
+            if request.headers.get("accept") == "application/json":
+                return JSONResponse({"error": {"field": "document_patch", "message": str(exc)}, "return_url": f"/returns/{rid}"}, status_code=400)
+            return await render_return(request, rid, status_code=400, document_error=str(exc),
+                                       document_values={"document_id": document_id, "expected_version": expected_version, "fields_json": fields_json, "evidence": evidence, "superseded_by": superseded_by})
+        return RedirectResponse(f"/returns/{rid}", status_code=303)
 
     @app.post("/returns/{rid}/resolve")
     async def resolve(request: Request, rid: str, action: str = Form(...), note: str = Form(""), filing_status: str = Form(""), facts_patch: str = Form(""), interrupt_id: str = Form(""), note_transfer_id: str = Form(""), note_chunk_index: int = Form(0), note_final_chunk: bool = Form(False)):

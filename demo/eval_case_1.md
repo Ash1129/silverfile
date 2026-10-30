@@ -45,7 +45,7 @@ Type the answers in the right-hand column. They are the ones in `data/fixtures/c
 | 19 | Last step: please upload your tax forms now. | `case1_clean` |
 | 20 | Here's what I have… Is that all correct? | `Yes` |
 
-Twenty questions, no pauses for a person, and the draft below. The automated version of exactly this conversation is `test_plain_case1_conversation_matches_the_prefilled_numbers` in `tests/test_intake.py`.
+After these twenty questions, the conversation pauses for staff confirmation of the missing `dual_status_alien` fact. Active intake questions for the deduction-chart exceptions are pending integration. For this synthetic case, the preparer confirms that it is false and resumes with `{"action":"continue","note":"Confirmed the synthetic taxpayer was not a dual-status alien.","facts_patch":{"dual_status_alien":false}}`. The draft below is then produced. The prefilled CLI demo already includes that explicit fixture fact and has no such pause. The automated conversational version is `test_plain_case1_conversation_matches_the_prefilled_numbers` in `tests/test_intake.py`.
 
 To see the dignity rules at work on the same case, swap in the awkward answers from the demo script at the end of `docs/INTAKE_DIGNITY.md`. Examples: a real-looking SSN at question 3, or "Actually, can we go back to my date of birth?" at question 11. The draft comes out the same. An advice question at question 7 also pauses the return for a Kushim employee: type `{"action":"continue"}` at the prompt, answer `Single`, and the run finishes as before.
 

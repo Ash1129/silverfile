@@ -90,5 +90,28 @@ Run `python run.py chat` and follow the case 1 answers in `demo/eval_case_1.md`,
 4. **Question 9 (someone else claim you):** type `No. Here's my social,` followed by the same made-up number. "No" counts, the number is not kept, and the person is told.
 5. **Question 11 (other income):** type `Actually, can we go back to my date of birth?`. Only the date is re-asked. Type `March 14, 1954`, then `No` to the other-income question.
 6. **Any later question:** type `quit`, then `python run.py chat --resume <id>` (the id is printed at the top). Every answer was kept, and the conversation carries on. On the web, use "Save and leave" and come back with the access code, and the conversation so far is still there.
-7. **Upload step:** type `case1_clean`, then `Yes` at the summary, and the draft is produced.
+7. **Upload step:** type `case1_clean`, then `Yes` at the summary. Until the deduction-chart intake questions are integrated, the run pauses for staff to confirm `dual_status_alien`. For this synthetic case, the preparer can resume with `{"action":"continue","note":"Confirmed from the synthetic case facts.","facts_patch":{"dual_status_alien":false}}`; the draft is then produced.
 8. **Optional, a new chat:** answer the first question with `I'm her daughter, I'm typing this for her` to show the exploitation stop.
+
+## Guardrails A integration contract: deduction-chart facts
+
+The backend gate is implemented independently of the pending active intake questions.
+
+| Intake fact | When confirmation is required | Values |
+| --- | --- | --- |
+| `dual_status_alien` | Every return, before eligibility permits calculation | JSON `true`, `false`, or `null`/missing for unknown |
+| `mfs_spouse_itemizes` | Only when `filing_status` is `mfs` | JSON `true`, `false`, or `null`/missing for unknown |
+
+An applicable `true` produces `chart_not_applicable`; `false` clears that particular condition. Missing, null or incorrectly typed answers produce structured `confirm_unknown_fact` requirements and an `uncertain_fact` pause. Unknown applicability is represented by `eligibility.chart_applies = null`, rather than an affirmative result. A known exception makes it false. Other eligibility and scope conditions still apply.
+
+For Guardrails B integration, questions can follow the existing one-question and plain-language conventions, after filing status is known. Answers belong in the two top-level intake fields. An uncertain answer stays null and may be listed in `_unknown_fields`; a confirmed answer removes its corresponding unknown marker. Spouse-itemising answers and markers are ignored outside MFS. No default false is inserted for ordinary sessions. Missing answers do not interrupt the first intake questions; completion triggers the confirmation gate. Explicit unknown answers can trigger an earlier pause.
+
+Until those questions are connected, a preparer confirms the facts through the existing authenticated correction form. For an MFS synthetic case where both facts have been checked and are false:
+
+```json
+{"action":"continue","note":"Preparer confirmed both deduction-chart facts from evidence.","facts_patch":{"dual_status_alien":false,"mfs_spouse_itemizes":false}}
+```
+
+Each open escalation still needs its own successful Continue check. A real exception is handed to a preparer with Halt; Accept does not override it. Corrections use the existing edit-completion, eligibility, recomputation and review path. Eligibility, Computation and finalization all reject unconfirmed required facts, including stale eligibility results. The regression matrix in `tests/test_escalations.py` covers true, false, missing, null, invalid types, MFS applicability, blocked Continue/Accept, and recovery after staff confirmation. Prefilled fixtures explicitly declare confirmed negative answers; conversational demos intentionally expose the temporary staff-confirmation step.
+
+The subsequent source-linked claim, document-correction and negation/unknown contracts are documented in `EVIDENCE_REVIEW.md`. They work with the current intake and staff dashboard. Unknown other income and document inventory now remain unresolved rather than becoming empty lists; an uncertain additional dependent preserves the people already recorded. The existing Schedule 1 question distinguishes none from uncertainty. Shared negative-answer and authority checks also run after model parsing. Conversation wording and end-to-end coverage for newly connected questions can build on these backend controls.

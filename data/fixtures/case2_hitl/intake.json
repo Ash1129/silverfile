@@ -21,6 +21,8 @@
  "_filing_status_unsure": true,
  "dependents": [],
  "can_be_claimed_as_dependent": false,
+ "dual_status_alien": false,
+ "mfs_spouse_itemizes": false,
  "documents_declared": [
   "SSA-1099",
   "1099-R",

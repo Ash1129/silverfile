@@ -74,6 +74,7 @@ CASES = {
         "intake": {
             "answering_party": "self", "taxpayer": {"first_name": "Eleanor", "last_name": "Whitfield", "ssn": "912-34-5678", "dob": "1954-03-14", "blind": False},
             "spouse": None, "married": False, "spouse_died_in_year": False, "filing_status": "single", "dependents": [], "can_be_claimed_as_dependent": False,
+            "dual_status_alien": False, "mfs_spouse_itemizes": False,  # confirmed synthetic fixture facts
             "documents_declared": ["W-2", "SSA-1099", "1099-R", "1099-INT"], "other_income_sources": [], "estimated_payments": 500.0, "schedule1_adjustments": 0.0,
             "schedule1_other_income": 0.0, "schedule2_line3": 0.0, "schedule3_line8": 0.0, "refund_account_description": "my checking account at Finger Lakes Savings", "refund_account_is_own": True,
             "noted_questions": [], "volunteered_ssn_events": [], "_uploaded": True, "_confirmed": True, "_dependents_done": True,
@@ -91,6 +92,7 @@ CASES = {
             "answering_party": "self", "taxpayer": {"first_name": "Harold", "last_name": "Benson", "ssn": "923-45-6789", "dob": "1949-11-02", "blind": True},
             "spouse": {"first_name": "Margaret", "last_name": "Benson", "ssn": "945-67-8901", "dob": "1951-06-21", "blind": False, "date_of_death": "2025-05-09"}, "married": True, "spouse_died_in_year": True, "filing_status": None, "_filing_status_unsure": True,
             "dependents": [], "can_be_claimed_as_dependent": False, "documents_declared": ["SSA-1099", "1099-R", "1099-DIV"], "other_income_sources": [], "estimated_payments": 0.0, "schedule1_adjustments": 0.0,
+            "dual_status_alien": False, "mfs_spouse_itemizes": False,  # confirmed synthetic fixture facts
             "schedule1_other_income": 0.0, "schedule2_line3": 0.0, "schedule3_line8": 0.0, "refund_account_description": "our joint checking at Cayuga Trust", "refund_account_is_own": True,
             "noted_questions": [], "volunteered_ssn_events": [], "_uploaded": True, "_confirmed": True, "_dependents_done": True,
         },

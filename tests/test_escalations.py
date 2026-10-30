@@ -2,14 +2,113 @@
 escalation interrupt."""
 from __future__ import annotations
 
+import pytest
+
 from conftest import (
     CASE1, CASE2, CASE3, CASE4, case1_document_list, case2_document_list, document, interrupts, load_intake, resolve, run_prefilled,
 )
 from silverfile.agents.eligibility import run_eligibility
+from silverfile.security.validate import unknown_fact_actions
 
 
 def _open_kinds(state) -> list[str]:
     return [e["kind"] for e in state["escalations"] if e["status"] == "open"]
+
+
+# ---------------------------------------------------------------- deduction-chart confirmation contract
+
+def _chart_intake(filing_status="single"):
+    facts = load_intake(CASE2 if filing_status == "mfs" else CASE1)
+    return {**facts, "filing_status": filing_status, "spouse_died_in_year": False}
+
+
+@pytest.mark.parametrize("field,filing_status", [("dual_status_alien", "single"), ("mfs_spouse_itemizes", "mfs")])
+@pytest.mark.parametrize("value", [None, "false", 0, ""])
+def test_unconfirmed_chart_flags_are_unknown_not_negative(field, filing_status, value):
+    facts = {**_chart_intake(filing_status), field: value}
+    result = run_eligibility({"intake": facts})
+    assert result["eligibility"]["chart_applies"] is None
+    event = next(e for e in result["escalations"] if e["kind"] == "uncertain_fact")
+    assert event["details"]["required_actions"][0]["field"] == field
+    assert event["details"]["citation"] == "REF-SD-4"
+
+
+@pytest.mark.parametrize("field,filing_status", [("dual_status_alien", "single"), ("mfs_spouse_itemizes", "mfs")])
+@pytest.mark.parametrize("missing", [True, False], ids=["missing", "null"])
+def test_missing_chart_fact_blocks_continue_and_accept_until_staff_confirmation(field, filing_status, missing):
+    facts = _chart_intake(filing_status)
+    if missing:
+        facts.pop(field)
+    else:
+        facts[field] = None
+        facts["_unknown_fields"] = [field]
+    docs = case2_document_list() if filing_status == "mfs" else case1_document_list()
+    g, cfg, out = run_prefilled(f"chart-missing-{field}", docs, facts)
+    assert out["status"] == "waiting_human" and not out["lines"]
+    assert out["computation_version"] == 0
+    assert _open_kinds(out) == ["uncertain_fact"]
+    assert interrupts(g, cfg)[0]["escalation"]["details"]["required_actions"][0]["field"] == field
+    out = resolve(g, cfg, "continue")
+    assert out["status"] == "waiting_human" and out["hitl_log"][-1]["result"] == "no"
+    assert any(a.get("field") == field for a in out["hitl_log"][-1]["required_actions"])
+    out = resolve(g, cfg, "accept")
+    assert out["status"] == "waiting_human" and not out["lines"]
+    final = resolve(g, cfg, "continue", note="Preparer confirmed the exception does not apply.", facts_patch={field: False})
+    assert final["status"] == "complete" and final["eligibility"]["chart_applies"] is True
+    assert final["intake"][field] is False
+    assert final["computation_version"] == 1 and final["provenance_seal"]
+    assert any(e["event"] == "continue_check" and e["result"] == "yes" for e in final["hitl_log"])
+
+
+@pytest.mark.parametrize("field,filing_status", [("can_be_claimed_as_dependent", "single"), ("dual_status_alien", "single"), ("mfs_spouse_itemizes", "mfs")])
+def test_confirmed_chart_exceptions_cannot_be_overridden_by_continue_or_accept(field, filing_status):
+    facts = {**_chart_intake(filing_status), field: True}
+    docs = case2_document_list() if filing_status == "mfs" else case1_document_list()
+    g, cfg, out = run_prefilled(f"chart-true-{field}", docs, facts)
+    assert out["status"] == "waiting_human" and not out["lines"]
+    assert _open_kinds(out) == ["chart_not_applicable"]
+    for action in ("continue", "accept"):
+        out = resolve(g, cfg, action)
+        assert out["status"] == "waiting_human" and not out["lines"]
+        assert out["hitl_log"][-1]["result"] == "no"
+    assert resolve(g, cfg, "halt", note="The confirmed exception requires a preparer.")["status"] == "halted"
+
+
+@pytest.mark.parametrize("filing_status", ["single", "mfj", "hoh", "qss"])
+def test_spouse_itemising_flag_and_its_unknown_marker_do_not_apply_outside_mfs(filing_status):
+    facts = {**_chart_intake(), "filing_status": filing_status, "mfs_spouse_itemizes": True,
+             "_unknown_fields": ["mfs_spouse_itemizes"]}
+    assert unknown_fact_actions({"intake": facts}) == []
+    assert run_eligibility({"intake": facts})["eligibility"]["chart_applies"] is True
+
+
+def test_missing_chart_answers_do_not_interrupt_unfinished_intake():
+    assert unknown_fact_actions({"intake": {"filing_status": "mfs"}}) == []
+    facts = {"filing_status": "mfs", "dual_status_alien": None}
+    assert [a["field"] for a in unknown_fact_actions({"intake": facts})] == ["dual_status_alien"]
+    facts = {"filing_status": "mfs"}
+    assert {a["field"] for a in unknown_fact_actions({"intake": facts, "intake_complete": True})} == {"dual_status_alien", "mfs_spouse_itemizes"}
+
+
+@pytest.mark.parametrize("field,filing_status", [("dual_status_alien", "single"), ("mfs_spouse_itemizes", "mfs")])
+def test_computation_refuses_missing_chart_facts_even_with_stale_eligibility(field, filing_status):
+    from silverfile.agents.computation import run_computation
+    facts = _chart_intake(filing_status)
+    facts.pop(field)
+    out = run_computation({"intake": facts, "eligibility": {"chart_applies": True}})
+    assert "lines" not in out
+    assert out["escalations"][0]["kind"] == "uncertain_fact"
+    assert out["escalations"][0]["details"]["required_actions"][0]["field"] == field
+
+
+def test_finalization_refuses_unknown_chart_fact_despite_a_stale_passing_review():
+    from silverfile.graph import finalize_node
+    _, _, out = run_prefilled("chart-finalize", case1_document_list(), load_intake(CASE1))
+    assert out["status"] == "complete"
+    out["intake"].pop("dual_status_alien")
+    result = finalize_node(out)
+    assert result["status"] == "halted" and "unknown" in result["halted_reason"]
+    assert "provenance_seal" not in result
 
 
 # ---------------------------------------------------------------- case2: spouse died during the year

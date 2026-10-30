@@ -32,7 +32,7 @@ class Person(TypedDict, total=False):
     last_name: str
     ssn: str  # 900-series test SSNs only; validated at entry
     dob: str  # ISO date
-    blind: bool
+    blind: bool | None
     date_of_death: str | None
 
 
@@ -50,10 +50,10 @@ class IntakeFacts(TypedDict, total=False):
     married: bool | None
     spouse_died_in_year: bool | None
     filing_status: FilingStatus | None
-    dependents: list[Dependent]
+    dependents: list[Dependent] | None
     can_be_claimed_as_dependent: bool | None
-    documents_declared: list[str]  # e.g. ["W-2", "SSA-1099", "1099-INT"]
-    other_income_sources: list[str]  # free text that may reveal out-of-scope items
+    documents_declared: list[str] | None  # e.g. ["W-2", "SSA-1099", "1099-INT"]; None is unknown
+    other_income_sources: list[str] | None  # free text; unknown is not an empty list
     estimated_payments: float | None
     schedule1_adjustments: float | None  # line 10 (Schedule 1, line 26)
     schedule1_other_income: float | None  # line 8
@@ -66,6 +66,7 @@ class IntakeFacts(TypedDict, total=False):
     volunteered_ssn_events: list[str]  # how an unrequested SSN was handled
     mfs_spouse_itemizes: bool | None
     dual_status_alien: bool | None
+    document_claims: list[dict[str, Any]]  # source-linked statements, never replacement return lines
 
 
 class DocumentInput(TypedDict, total=False):
@@ -96,6 +97,8 @@ class ExtractedDocument(TypedDict, total=False):
     tokens_in: int
     tokens_out: int
     security_flags: list[str]  # prompt-injection text, an SSN in a text field, an implausible amount (security/validate.py)
+    correction: dict[str, Any]
+    superseded_by: str | None  # confirmed identical-source duplicate, retained for audit
 
 
 class Provenance(TypedDict, total=False):
@@ -119,7 +122,7 @@ class EligibilityResult(TypedDict, total=False):
     filing_status_valid: bool
     boxes_12d: dict[str, bool]
     box_count: int
-    chart_applies: bool
+    chart_applies: bool | None  # None: required exception facts have not been confirmed
     schedules: list[str]
     in_scope: bool
     out_of_scope_items: list[str]
@@ -304,8 +307,9 @@ class ReturnState(TypedDict, total=False):
     pending_escalation_id: str | None
     blocking_review: BlockingReviewEvent | None
     human_edit: HumanEdit | None
-    recompute_stage: Literal["eligibility", "computation", "review"] | None
+    recompute_stage: Literal["extraction", "eligibility", "computation", "review"] | None
     resolution_request: dict[str, Any] | None
+    document_overrides: dict[str, dict[str, Any]]
     hitl_log: Annotated[list[dict[str, Any]], operator.add]
     halted_reason: str | None
     # orchestration

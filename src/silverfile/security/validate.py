@@ -73,14 +73,32 @@ def checkbox(v: Any) -> bool | None:
     return None
 
 
-def unknown_fact_actions(state: dict[str, Any]) -> list[dict[str, Any]]:
+def chart_confirmation_fields(facts: dict[str, Any]) -> tuple[str, ...]:
+    """Facts needed for the chart; spouse itemising matters only for MFS."""
+    return ("dual_status_alien", "mfs_spouse_itemizes") if facts.get("filing_status") == "mfs" else ("dual_status_alien",)
+
+
+def unknown_fact_actions(state: dict[str, Any], *, require_chart_facts: bool = False) -> list[dict[str, Any]]:
     """Deterministic requirements for facts that must not silently become zero/false."""
     facts = state.get("intake") or {}
     unknown = set(facts.get("_unknown_fields") or [])
-    for key in ("estimated_payments", "schedule1_adjustments", "schedule1_other_income", "schedule2_line3", "schedule2_line21", "schedule3_line8", "can_be_claimed_as_dependent"):
+    if facts.get("filing_status") and facts["filing_status"] != "mfs":
+        unknown.discard("mfs_spouse_itemizes")
+    for key in chart_confirmation_fields(facts):
+        # Missing answers are allowed while intake is in progress, never at a decision gate.
+        if require_chart_facts or state.get("intake_complete") or facts.get("_confirmed") or key in facts:
+            if type(facts.get(key)) is not bool:
+                unknown.add(key)
+    for key in ("estimated_payments", "schedule1_adjustments", "schedule1_other_income", "schedule2_line3", "schedule2_line21", "schedule3_line8", "can_be_claimed_as_dependent", "other_income_sources", "documents_declared", "spouse_died_in_year", "refund_account_is_own", "dependents"):
         if key in facts and facts[key] is None:
             unknown.add(key)
-    for doc_id, doc in (state.get("extracted") or {}).items():
+    for person in ("taxpayer", "spouse"):
+        if "blind" in (facts.get(person) or {}) and facts[person]["blind"] is None:
+            unknown.add(f"{person}.blind")
+    if facts.get("answering_party") == "unknown":
+        unknown.add("answering_party")
+    from ..reconciliation import active_documents
+    for doc_id, doc in active_documents(state).items():
         fields = doc.get("fields") or {}
         if doc.get("kind") == "1099-R":
             for key in ("taxable_not_determined", "ira_sep_simple"):
@@ -90,7 +108,7 @@ def unknown_fact_actions(state: dict[str, Any]) -> list[dict[str, Any]]:
             if value is None and key in {"wages", "net_benefits", "gross_distribution", "taxable_amount", "qcd_amount", "interest_income", "tax_exempt_interest", "ordinary_dividends", "qualified_dividends", "federal_withheld"}:
                 if key != "taxable_amount" or fields.get("taxable_not_determined") is not True:
                     unknown.add(f"document:{doc_id}:{key}")
-    return [{"code": "confirm_unknown_fact", "field": key, "description": f"Confirm {key} from evidence; unknown is not zero or no.", "status": "pending"} for key in sorted(unknown)]
+    return [{"code": "confirm_unknown_fact", "field": key, "description": f"Confirm {key} from evidence; unknown is not zero or no.", "status": "pending", **({"citation": "REF-SD-4"} if key in chart_confirmation_fields(facts) else {})} for key in sorted(unknown)]
 
 
 def clean_fields(kind: str, raw: dict[str, Any], schema: dict[str, str], money_fields: set[str], checkbox_fields: set[str]) -> tuple[dict[str, Any], list[str], list[str]]:
@@ -170,7 +188,7 @@ PATCH_FIELDS: dict[str, Any] = {
     "third_party_authority": str, "refund_account_description": str, "refund_account_is_own": bool,
     "estimated_payments": float, "schedule1_adjustments": float, "schedule1_other_income": float, "schedule2_line3": float, "schedule2_line21": float, "schedule3_line8": float,
     "mfs_spouse_itemizes": bool, "dual_status_alien": bool, "taxpayer": dict, "spouse": dict,
-    "dependents": list,
+    "dependents": list, "document_claims": list,
 }
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -200,6 +218,10 @@ def clean_facts_patch(patch: Any) -> dict[str, Any]:
         elif spec is str:
             out[k] = _patch_text(k, v)
         elif spec is list:
+            if k == "document_claims":
+                from ..reconciliation import clean_claims
+                out[k] = clean_claims(v)
+                continue
             if not isinstance(v, list) or len(v) > 12:
                 raise ValueError(f"{k} must be a list (at most 12 items).")
             if k == "dependents":
@@ -310,10 +332,17 @@ def check_state(values: dict[str, Any], thread_id: str) -> list[str]:
     edit = values.get("human_edit")
     if edit is not None and (not isinstance(edit, dict) or edit.get("status") not in {"editing", "completed", "recomputed", "blocked"}):
         problems.append("malformed human edit state")
-    if values.get("recompute_stage") not in (None, "eligibility", "computation", "review"):
+    if values.get("recompute_stage") not in (None, "extraction", "eligibility", "computation", "review"):
         problems.append("unknown recomputation stage")
     if values.get("resolution_request") is not None and not isinstance(values["resolution_request"], dict):
         problems.append("malformed resolution request")
+    overrides = values.get("document_overrides") or {}
+    if not isinstance(overrides, dict):
+        problems.append("malformed document correction records")
+    else:
+        for override in overrides.values():
+            if not isinstance(override, dict) or not isinstance(override.get("fields"), dict) or not isinstance(override.get("original_record"), dict) or not all(isinstance(override.get(k), str) and override[k] for k in ("source_key", "actor", "at", "evidence")):
+                problems.append("malformed document correction record")
     for entry in values.get("hitl_log") or []:
         if not isinstance(entry, dict) or not entry.get("event") or entry.get("result") not in (None, "yes", "no"):
             problems.append("malformed human workflow log entry")

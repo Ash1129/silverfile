@@ -7,6 +7,8 @@
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 from langgraph.types import Command
 
@@ -339,8 +341,8 @@ def _resolution_form_fields(html):
 
 
 @pytest.mark.parametrize("bad_json, message", [
-    ('{\n  "estimated_payments": 850,\n}', "Invalid JSON at line 3, column 1"),
-    ('{"estimated_payments": }', "Invalid JSON at line 1, column"),
+    ('{\n  "estimated_payments": 850,\n}', None),
+    ('{"estimated_payments": }', None),
     ('[]', "Facts must be a JSON object"),
     ('true', "Facts must be a JSON object"),
     ('{"unexpected_field": true}', "is not a fact a resolution can change"),
@@ -349,6 +351,11 @@ def _resolution_form_fields(html):
 ])
 def test_invalid_facts_stay_in_the_same_form_without_changing_the_return(web, bad_json, message):
     from webhelpers import staff_client, token, interrupt_id
+    if message is None:
+        # Error locations vary by Python version; the form must show the parser's location.
+        with pytest.raises(json.JSONDecodeError) as error:
+            json.loads(bad_json)
+        message = f"Invalid JSON at line {error.value.lineno}, column {error.value.colno}:"
     rid = service.create_return(service.fixture_documents("case2_hitl"), load_intake(CASE2), actor=SYSTEM)
     service.run(rid)
     service.resolve(rid, {"action": "save_edit", "facts_patch": {"estimated_payments": 100}}, actor=PREPARER)
