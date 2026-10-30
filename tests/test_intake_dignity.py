@@ -332,3 +332,54 @@ def test_model_confidence_cannot_override_explicit_uncertainty():
     guessed_status = {"intent": "answer", "updates": {"filing_status": "single"}, "_text": "I don't know"}
     facts = apply("filing_status", guessed_status, {}, [])
     assert not facts.get("filing_status") and facts["_filing_status_unsure"] is True
+
+
+# ---------------------------------------------------------------- pressure or coercion (brief §4.4 condition 6)
+@pytest.mark.parametrize("answer", [
+    "I am being forced to this help",
+    "They made me sign this, I'm not sure why",
+    "My nephew told me exactly what to say",
+    "I was forced into this",
+    "I'm scared of my son",
+])
+def test_a_statement_of_pressure_stops_the_return_at_any_question(answer):
+    # said where a date of birth was asked for, the way it happened in a live test run
+    state, turns = converse(SINGLE, extra={"dob": [answer]}, stop_at="blind")
+    assert kinds(state).count("exploitation") == 1
+    esc = next(e for e in state["escalations"] if e["kind"] == "exploitation")
+    assert esc["id"].startswith("esc-pressure") and esc["status"] == "open"
+    assert "privately" in esc["reason"]  # tells the preparer to make contact away from this screen
+    said = next(t for t in turns if t["answer"] == answer)
+    assert "Kushim employee can get in touch with you directly" in said["reply"]
+    # the reply does not repeat the person's words back: whoever is applying pressure may be reading the screen
+    assert "forced" not in said["reply"].lower() and "scared" not in said["reply"].lower()
+    # nothing the person already said is lost, and the same question is still the next one
+    assert state["intake"]["taxpayer"]["first_name"] == "Eleanor"
+    assert turns[turns.index(said) + 1]["slot"] == "dob"  # the same question is asked again next
+
+
+def test_pressure_is_noticed_once_not_on_every_turn():
+    state, _ = converse(SINGLE, extra={"dob": ["I am being forced to this help", "They are making me sign this"]}, stop_at="blind")
+    assert kinds(state).count("exploitation") == 1
+
+
+@pytest.mark.parametrize("answer", [
+    "My husband served in the armed forces",
+    "I retired from the labor force in 2015",
+    "I want my refund to go to my own account",
+    "Thanks, that makes me happy",
+    "I was forced to retire early",
+])
+def test_ordinary_remarks_that_share_a_word_do_not_stop_the_return(answer):
+    state, _ = converse(SINGLE, extra={"other_income": [answer]})
+    assert "exploitation" not in kinds(state)
+
+
+def test_pressure_at_the_very_first_question_stops_the_return():
+    # seen in a live test run: said in answer to "am I speaking with the person whose tax return this is?"
+    answer = "I want to say no but Im being pressured to yes"
+    state, turns = converse(SINGLE, extra={"answering_party": [answer]}, stop_at="name")
+    assert kinds(state).count("exploitation") == 1
+    first = turns[0]
+    assert first["slot"] == "answering_party" and "Kushim employee can get in touch with you directly" in first["reply"]
+    assert turns[1]["slot"] == "answering_party"  # the question is asked again, not skipped as "yes, it's me"
