@@ -16,6 +16,9 @@ from silverfile import keysetup
 from silverfile.keysetup import SetupError, check_key_shape, run_setup
 
 GOOD = "sk-ant-api03-" + "A" * 80
+# Windows has no owner/group/other mode bits (chmod only sets read-only); there
+# .env is protected by the folder's access list, which these tests do not check.
+POSIX = os.name == "posix"
 
 
 def _example(tmp_path):
@@ -36,7 +39,8 @@ def test_setup_saves_a_checked_key_owner_only_and_never_prints_it(tmp_path):
     values = keysetup.read_values(env)
     assert values["ANTHROPIC_API_KEY"] == GOOD
     assert len(values["SILVERFILE_DATA_KEY"]) >= 40  # generated
-    assert stat.S_IMODE(os.stat(env).st_mode) == 0o600
+    if POSIX:
+        assert stat.S_IMODE(os.stat(env).st_mode) == 0o600
     assert GOOD not in printed and GOOD[:20] not in printed and "…AAAA" in printed
     text = env.read_text()
     assert "# comment kept" in text and "SILVERFILE_DATA_DIR=data/runtime" in text and text.count("ANTHROPIC_API_KEY=") == 1
@@ -85,6 +89,7 @@ def test_an_existing_data_key_is_never_replaced_and_a_key_can_be_kept(tmp_path):
     assert code == 0 and again == first and "left as it is" in printed and "Kept" in printed
 
 
+@pytest.mark.skipif(not POSIX, reason="mode bits are POSIX only")
 def test_a_loose_env_file_is_tightened(tmp_path):
     env = tmp_path / ".env"
     env.write_text("ANTHROPIC_API_KEY=\n")
