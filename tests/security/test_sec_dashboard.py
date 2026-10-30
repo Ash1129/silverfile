@@ -72,12 +72,28 @@ def test_taxpayers_only_ever_see_their_own_return(web):
     a_page, b_page = a.get("/t").text, b.get("/t").text
     assert "Alice Avery" in a_page and "Alice" not in b_page
     # A's form cannot answer B's question: the interrupt id is checked against A's own return
-    r = a.post("/t/answer", data={"text": "Mallory", "csrf_token": token(a_page), "interrupt_id": interrupt_id(b_page)})
-    assert r.status_code == 409
+    r = a.post("/t/answer", data={"text": "Mallory", "csrf_token": token(a_page), "interrupt_id": interrupt_id(b_page)}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/t"
+    assert audit.recent(1, kind="stale_submission")[0]["return_id"] == auth.load_session(a.cookies[webmod.TAXPAYER_COOKIE], "taxpayer").subject
     rid_b = auth.load_session(b.cookies[webmod.TAXPAYER_COOKIE], "taxpayer").subject
     assert "Mallory" not in str(service.get_state(rid_b)["messages"])
     # there is no taxpayer route that takes a return id at all
     assert not [r.path for r in web.routes if r.path.startswith("/t") and "{" in r.path]
+
+
+def test_a_double_submitted_answer_is_refused_and_lands_on_the_current_question(web):
+    c = TestClient(web)
+    start_taxpayer(c)
+    rid = auth.load_session(c.cookies[webmod.TAXPAYER_COOKIE], "taxpayer").subject
+    page = c.get("/t").text
+    form = {"text": "yes it's me", "csrf_token": token(page), "interrupt_id": interrupt_id(page)}
+    assert c.post("/t/answer", data=form, follow_redirects=False).status_code == 303
+    asked = service.pending(rid)
+    # the second click on Send carries the same, now answered, question
+    again = c.post("/t/answer", data={**form, "text": "Mallory"}, follow_redirects=False)
+    assert again.status_code == 303 and again.headers["location"] == "/t"
+    assert service.pending(rid) == asked and "Mallory" not in str(service.get_state(rid)["messages"])
+    assert audit.recent(1, kind="stale_submission")[0]["return_id"] == rid
 
 
 @pytest.mark.parametrize("guess", ["912-34-5678", "Eleanor Whitfield", "ret-00000000", "", "AAAA-AAAA-AAAA-AAAA-AAAA-AAAA"])

@@ -277,7 +277,7 @@ def pending_id(return_id: str) -> str | None:
     return ids[0] if ids else None
 
 
-def _check_interrupt(return_id: str, interrupt_id: str | None) -> None:
+def check_interrupt(return_id: str, interrupt_id: str | None) -> None:
     if interrupt_id is None:
         return
     current = pending_id(return_id)
@@ -313,7 +313,7 @@ def answer(return_id: str, text: str, documents: list[dict[str, Any]] | None = N
         raise Forbidden("Staff do not answer for the taxpayer; the taxpayer answers in their own session.")
     text = clean_answer(text)
     with _lock:
-        _check_interrupt(return_id, interrupt_id)
+        check_interrupt(return_id, interrupt_id)
         p = pending(return_id)
         if not p or p.get("type") not in ("question", "upload"):
             raise ServiceError("No question is waiting for the taxpayer on this return.")
@@ -346,7 +346,7 @@ def resolve(return_id: str, resolution: dict[str, Any], *, actor: Principal, int
     """
     _require(actor, return_id, "resolve_escalation")
     with _lock:
-        _check_interrupt(return_id, interrupt_id)
+        check_interrupt(return_id, interrupt_id)
         p = pending(return_id)
         if not p or p.get("type") != "escalation":
             raise ServiceError("No escalation is waiting on this return.")
