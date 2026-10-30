@@ -28,6 +28,12 @@ I used Claude, in a chat with access to the repository, for my focus area, which
 
 No real taxpayer data was used at any point. All SSNs are in the 900 test series.
 
+### Task division and management (Mahika Arora)
+
+I used Claude (Claude Code, Sonnet 5.5), in a chat with access to our repository, for my focus area: the Orchestrator's routing, the parallel extraction branch, the bounded review loop, the loop guard and the graph diagram. After PR #6 merged, I asked it to compare the Orchestrator's routing table against the tests and the diagram. It found that the new `resolution_check` node and the two new routing rules at the top of `decide_next` had no tests and were missing from the diagram. Claude drafted the tests in `tests/test_routing_table.py` and `tests/test_orchestration_flow.py`, the updated `docs/graph.mmd` and `docs/graph.png`, the design note `docs/ORCHESTRATION.md`, the "Team and roles" table in the README, and the header API-key control (`gate.py`, the dashboard templates and their tests). I directed the work, reviewed each change, ran the two orchestration test files on my own machine (50 and 9 passed) and the full suite (509 passed, 5 failed for reasons unrelated to my files: four tests need a real git checkout and one depends on Python 3.13's JSON error wording), uploaded the files and opened the pull requests myself. I asked for the API-key control after the professor's remarks about how easy and safe it should be to add a key: it is held only in the server's memory for the browser session and is never saved. Claude's own review of the routing found one gap that I have flagged for the team in `docs/ORCHESTRATION.md` section 9 rather than fixed: a Review finding aimed at Intake is routed to Computation.
+
+No real taxpayer data was used at any point.
+
 ## Codex-assisted HITL revision
 
 The explicit blocking-review, human-edit completion, deterministic continuation check and unknown-fact controls were implemented with Codex from the human-specified requirements. Verification used the offline pytest suite, ten existing evaluation cases, a bounded long-note transfer check and synthetic preview data. The working files, environments and validation logs are kept in the Git-ignored `agent_workspace/` directory. No real taxpayer data was used, and no commit was created by the agent.
