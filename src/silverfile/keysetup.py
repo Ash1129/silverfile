@@ -121,7 +121,8 @@ def run_setup(*, env: Path | None = None, example: Path | None = None, ask_secre
     env = env or ROOT / ".env"
     example = example or ROOT / ".env.example"
     created = ensure_env_file(env, example)
-    say(f"{'Created' if created else 'Using'} {env.name} (readable by you only).")
+    who = "readable by you only" if os.name == "posix" else "protected by this folder's Windows permissions"
+    say(f"{'Created' if created else 'Using'} {env.name} ({who}).")
     current = read_values(env)
     updates: dict[str, str] = {}
 
