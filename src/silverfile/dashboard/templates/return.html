@@ -79,6 +79,7 @@
         <label>Other facts to correct (JSON object, optional)
           <textarea id="facts-patch-input" name="facts_patch" rows="3" placeholder='{"estimated_payments": 500}'{% if facts_patch_error %} aria-invalid="true" aria-describedby="facts-patch-error" autofocus{% endif %}>{{ form_values.get('facts_patch', '') }}</textarea>
         </label>
+        <p class="muted small">This editor changes intake facts such as estimated payments. Document box values such as W-2 wages use <a href="#document-transcription-review">Document transcription review</a> below, with its own source-field editor and correction button.</p>
         {% if facts_patch_error %}<p id="facts-patch-error" class="error" role="alert">{{ facts_patch_error }}</p>{% endif %}
         <div class="actions">
           <button type="submit" name="action" value="continue" class="button primary">Continue and verify</button>

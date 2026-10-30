@@ -201,6 +201,9 @@ def clean_facts_patch(patch: Any) -> dict[str, Any]:
     for k, v in patch.items():
         spec = PATCH_FIELDS.get(k)
         if spec is None:
+            from ..agents.extraction import SCHEMAS
+            if any(k in schema for schema in SCHEMAS.values()):
+                raise ValueError(f"{k!r} is a document box value, not an intake fact. Use Document transcription review > Corrected source fields, then Apply evidence-backed correction and recheck.")
             raise ValueError(f"{k!r} is not a fact a resolution can change.")
         if isinstance(spec, tuple):
             if v not in spec:

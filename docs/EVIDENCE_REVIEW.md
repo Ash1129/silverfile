@@ -20,6 +20,8 @@ Eligibility exposes mismatches with both values, field/box references, document 
 
 On a paused return, **Document transcription review** shows each active extracted record, its box schema, version and an authenticated original-source download.
 
+The page has two distinct JSON editors. **Other facts to correct** changes intake facts, such as estimated payments. **Corrected source fields** inside the selected document changes box values, such as W-2 wages, using **Apply evidence-backed correction and recheck**. Submitting `wages` through the facts form is rejected without changing the return; the error and a navigation link identify the source-field editor.
+
 1. The preparer checks the original source and enters only the incorrect box fields as a JSON object.
 2. An evidence explanation identifies the source, boxes and reason. The request carries the current document version and interrupt token.
 3. `correct_document` creates a checkpointed work order. Only Extraction applies its normalized values; the original file is unchanged. Unrelated documents are not re-read for this correction.

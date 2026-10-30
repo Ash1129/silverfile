@@ -9,7 +9,7 @@
 </section>
 {% endif %}
 {% if pending and pending.type == "escalation" and can("resolve_escalation") and active_documents %}
-<section class="card">
+<section class="card" id="document-transcription-review">
   <h2>Document transcription review</h2>
   <p>The original source stays unchanged. An evidence-backed correction is applied by Extraction, followed by eligibility, recomputation and review. A genuine out-of-scope case still needs a preparer handoff.</p>
   {% if document_error %}<p role="alert" class="error">{{ document_error }}</p>{% endif %}
@@ -24,7 +24,7 @@
       <input type="hidden" name="interrupt_id" value="{{ pending_id }}">
       <input type="hidden" name="document_id" value="{{ id }}">
       <input type="hidden" name="expected_version" value="{{ doc.version }}">
-      <label>Corrected source fields (JSON object)
+      <label>Corrected source fields (document boxes, JSON object)
         <textarea name="fields_json" rows="4" spellcheck="false">{{ document_values.fields_json if document_values.document_id == id else '{}' }}</textarea>
       </label>
       <label>Evidence explanation: original source, boxes and reason

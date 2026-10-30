@@ -209,6 +209,26 @@ def test_correction_form_preserves_bad_input_and_can_retry(web):
     assert good.status_code == 303 and service.get_state(rid)["status"] == "complete"
 
 
+def test_document_box_in_facts_form_points_to_the_separate_source_editor(web):
+    from webhelpers import interrupt_id, staff_client, token
+    rid, key, state = start_conflict()
+    client, _ = staff_client(web, "wrong-editor-reviewer")
+    page = client.get(f"/returns/{rid}")
+    before = service.state_json(rid)
+    wrong = client.post(f"/returns/{rid}/resolve", data={"action": "continue", "facts_patch": '{"wages":35000}',
+                        "csrf_token": token(page.text), "interrupt_id": interrupt_id(page.text)}, follow_redirects=False)
+    assert wrong.status_code == 400
+    assert "is a document box value, not an intake fact" in wrong.text
+    assert "Use Document transcription review" in wrong.text
+    assert 'href="#document-transcription-review"' in wrong.text
+    assert 'id="document-transcription-review"' in wrong.text
+    assert service.state_json(rid) == before
+    right = client.post(f"/returns/{rid}/document-correction", data={"document_id": key, "expected_version": state["extracted"][key]["version"],
+                        "fields_json": '{"wages":35000}', "evidence": "Checked the original synthetic W-2 Box 1.",
+                        "csrf_token": token(wrong.text), "interrupt_id": interrupt_id(wrong.text)}, follow_redirects=False)
+    assert right.status_code == 303 and service.get_state(rid)["status"] == "complete"
+
+
 @pytest.mark.parametrize("claim", [None, {}, [{"kind": [], "field": "wages", "value": 1}], [{"kind": "W-2", "field": "status", "value": 1}], [{"kind": "W-2", "field": "wages", "value": float("nan")}]] )
 def test_claim_validation_rejects_ambiguous_or_untyped_inputs(claim):
     with pytest.raises(ValueError):
