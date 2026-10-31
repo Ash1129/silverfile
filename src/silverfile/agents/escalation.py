@@ -7,6 +7,7 @@ from typing import Any
 
 from langgraph.types import interrupt
 
+from .. import memory
 from ..provenance import now_iso
 from ..security import pii, validate
 from ..state import ReturnState
@@ -224,7 +225,8 @@ def escalation_node(state: ReturnState) -> dict[str, Any]:
         if "document_claims" in patch and not note:
             return blocked([requirement("claim_correction_evidence", "A source-linked claim correction needs a written evidence explanation.")])
         resolution["facts_patch"] = patch
-        out["intake"] = _patched_facts(state.get("intake") or {}, patch)
+        # the taxpayer's earlier answer stays in the answer history beside the employee's correction
+        out["intake"] = memory.record_answer_changes(state.get("intake") or {}, _patched_facts(state.get("intake") or {}, patch), slot=esc["kind"], at=now_iso(), how="kushim")
         out.update(lines={}, provenance={}, provenance_seal=None, eligibility={}, review_passed=False, review_round=0, revise_target=None)
         out["human_edit"] = {"id": previous.get("id") or f"edit:{esc['id']}:{len(state.get('hitl_log') or [])}", "escalation_id": esc["id"], "status": "completed", "facts_patch": patch, "completed_by": actor, "completed_at": now_iso()}
         if event:

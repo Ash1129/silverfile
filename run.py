@@ -43,7 +43,10 @@ def _docs_for_case(case: str) -> list[dict]:
 
 
 def _pending(g, cfg):
-    return [i.value for t in g.get_state(cfg).tasks for i in t.interrupts]
+    from silverfile.memory import with_resume_recap
+
+    snap = g.get_state(cfg)
+    return [with_resume_recap(i.value, snap.values) for t in snap.tasks for i in t.interrupts]
 
 
 def cmd_demo(args: argparse.Namespace) -> int:

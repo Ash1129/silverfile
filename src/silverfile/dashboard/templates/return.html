@@ -129,6 +129,18 @@
     </section>
     {% endif %}
 
+    {% set changed = (state.intake._answer_history or []) | rejectattr("old", "none") | list %}
+    {% if changed %}
+    <section class="card">
+      <h2>Changed answers</h2>
+      <p class="muted small">Answers the taxpayer corrected, went back to, or a Kushim employee changed. The earlier value is kept here; the return uses the newest one.</p>
+      <table class="list">
+        <thead><tr><th>Answer</th><th>Earlier</th><th>Now</th><th>How</th><th>At</th></tr></thead>
+        <tbody>{% for h in changed %}<tr><td><code>{{ h.field }}</code></td><td>{{ h.old | tojson | mask }}</td><td>{% if h.new is none %}<span class="muted">asked again</span>{% else %}{{ h.new | tojson | mask }}{% endif %}</td><td>{{ {"corrected": "taxpayer corrected it", "went_back": "taxpayer went back", "kushim": "Kushim employee"}.get(h.how, h.how) }}</td><td class="nowrap">{{ h.at | when }}</td></tr>{% endfor %}</tbody>
+      </table>
+    </section>
+    {% endif %}
+
     <section class="card">
       <h2>Agent trace</h2>
       <p class="handoffs"><span class="muted small">{{ state.handoffs | length }} handoffs, the orchestrator between each:</span><br>{% for h, n in hop_chain %}<span class="hop hop-{{ h }}">{{ h }}{% if n > 1 %} ×{{ n }}{% endif %}</span>{% if not loop.last %}<span class="arrow">→</span>{% endif %}{% endfor %}</p>

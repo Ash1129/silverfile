@@ -9,7 +9,16 @@ Three kinds of memory:
    a short plain-language recap, used when a session resumes and shown in the
    dashboard. The orchestrator keeps the structured facts; the summary is for
    people and for prompts.
-3. Model context strategy (section 4.5): `ContextWindow` builds the messages
+   The same recap greets a taxpayer who comes back after a break
+   (`with_resume_recap`): the waiting question was written before the break,
+   so the recap is added when the question is shown, not when it was asked.
+3. Answer history: every change to an intake answer is kept in
+   `intake["_answer_history"]` with the old value, the new value, when and how
+   it changed (`record_answer_changes`). Going back clears a slot so it is
+   asked again, and a correction overwrites it, but the earlier answer is
+   never lost: the preparer sees it in the dashboard (`answer_history`).
+   Social Security numbers are never copied into the history.
+4. Model context strategy (section 4.5): `ContextWindow` builds the messages
    for the next model call. With the strategy on it uses selective recall: a
    rolling summary of the decisions so far plus the current item only. With it
    off it replays the whole history, which grows with every item. `run.py
@@ -18,13 +27,20 @@ Three kinds of memory:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
-from .agents.intake import summarize_facts
-from .state import ReturnState
+from .state import IntakeFacts, ReturnState
+
+RESUME_AFTER_MINUTES = 30  # a gap longer than this gets a "welcome back" recap
+WELCOME_BACK = "Welcome back. Here's where we were: "
+MAX_HISTORY = 200  # bounds the checkpoint; the oldest entries go first
+# bookkeeping and logs kept elsewhere; not answers the taxpayer gave
+NOT_ANSWERS = {"noted_questions", "volunteered_ssn_events", "security_flags"}
 
 
 def session_summary(state: ReturnState) -> str:
+    from .agents.intake import summarize_facts  # intake records answer history through this module
     facts = state.get("intake") or {}
     parts = [summarize_facts(facts)]
     n_docs = len(state.get("extracted") or {})
@@ -35,9 +51,97 @@ def session_summary(state: ReturnState) -> str:
     open_ = [e for e in state.get("escalations", []) if e.get("status") == "open"]
     if open_:
         parts.append(f"Waiting on a Kushim employee for: {', '.join(e['kind'] for e in open_)}.")
+    changed = [h for h in facts.get("_answer_history") or [] if h.get("old") is not None]
+    if changed:
+        parts.append(f"{len(changed)} earlier answer(s) changed; the earlier values are kept for the preparer.")
     if state.get("status") == "complete":
         parts.append("The draft is complete and ready for the preparer.")
     return " ".join(parts)
+
+
+def minutes_since(ts: str | None, now: datetime | None = None) -> float | None:
+    if not ts:
+        return None
+    try:
+        then = datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+    return ((now or datetime.now(timezone.utc)) - then).total_seconds() / 60
+
+
+def resume_recap(facts: IntakeFacts, now: datetime | None = None) -> str | None:
+    """The recap for a taxpayer coming back after a break, or None if there was no break."""
+    from .agents.intake import summarize_facts
+
+    gap = minutes_since(facts.get("_last_activity_at"), now)
+    if gap is None or gap <= RESUME_AFTER_MINUTES:
+        return None
+    return WELCOME_BACK + summarize_facts(facts) + " Let's continue. "
+
+
+def with_resume_recap(payload: dict[str, Any] | None, state: ReturnState, now: datetime | None = None) -> dict[str, Any] | None:
+    """The pending question as the taxpayer should see it now.
+
+    A question waits in the checkpoint exactly as it was written when it was
+    asked. If the taxpayer left and came back, it is shown with the recap in
+    front; the stored question is not changed.
+    """
+    if not payload or payload.get("type") not in ("question", "upload") or payload.get("slot") == "answering_party":
+        return payload
+    text = str(payload.get("text") or "")
+    recap = resume_recap(state.get("intake") or {}, now)
+    if not recap or text.startswith(WELCOME_BACK):
+        return payload
+    return {**payload, "text": recap + text, "recap": recap}
+
+
+def _flatten(facts: IntakeFacts) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for k, v in facts.items():
+        if k.startswith("_") or k in NOT_ANSWERS:
+            continue
+        if isinstance(v, dict):
+            for kk, vv in v.items():
+                out[f"{k}.{kk}"] = vv
+        else:
+            out[k] = v
+    return out
+
+
+def _safe(field_name: str, value: Any) -> Any:
+    if value is None:
+        return None
+    if "ssn" in field_name.split(".")[-1]:
+        return "[test SSN, not copied into the history]"
+    if field_name == "dependents" and isinstance(value, list):
+        return [{k: v for k, v in d.items() if k != "ssn"} for d in value if isinstance(d, dict)]
+    return value
+
+
+def record_answer_changes(before: IntakeFacts, after: IntakeFacts, *, slot: str, at: str, how: str | None = None) -> IntakeFacts:
+    """Append one history entry to `after` for each answer that differs from `before`.
+
+    Each entry says how the answer changed: "answered" (it had no value),
+    "corrected" (a different value replaced one already given), "went_back"
+    (the value was cleared so the question is asked again). `how` overrides
+    that, for example "kushim" when a Kushim employee made the change.
+    """
+    old, new = _flatten(before), _flatten(after)
+    history = list(after.get("_answer_history") or [])
+    for name in sorted(set(old) | set(new)):
+        o, n = old.get(name), new.get(name)
+        if o == n:
+            continue
+        kind = how or ("answered" if o is None else "went_back" if n is None else "corrected")
+        history.append({"at": at, "slot": slot, "field": name, "old": _safe(name, o), "new": _safe(name, n), "how": kind})
+    if history:
+        after["_answer_history"] = history[-MAX_HISTORY:]
+    return after
+
+
+def answer_history(state: ReturnState) -> list[dict[str, Any]]:
+    """Every change to an intake answer, oldest first, for the preparer."""
+    return list((state.get("intake") or {}).get("_answer_history") or [])
 
 
 @dataclass

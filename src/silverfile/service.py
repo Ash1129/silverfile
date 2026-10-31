@@ -45,7 +45,7 @@ from . import llm
 from .config import ROOT, settings
 from .forms.render import mask_ssn, mask_ssn_deep
 from .graph import app, new_return_state
-from .memory import session_summary
+from .memory import session_summary, with_resume_recap
 from .provenance import now_iso
 from .security import audit, auth, crypto, pii, ratelimit, uploads, validate
 from .security.auth import Principal
@@ -269,6 +269,13 @@ def pending(return_id: str) -> dict[str, Any] | None:
     """The first interrupt payload waiting on a person, or None."""
     pend = _interrupts(_snapshot(return_id))
     return pend[0] if pend else None
+
+
+def pending_for_taxpayer(return_id: str) -> dict[str, Any] | None:
+    """pending(), as the taxpayer sees it: with a recap in front after a break (memory.with_resume_recap)."""
+    snap = _snapshot(return_id)
+    pend = _interrupts(snap)
+    return with_resume_recap(pend[0], snap.values) if pend else None
 
 
 def pending_id(return_id: str) -> str | None:

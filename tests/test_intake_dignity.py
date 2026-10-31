@@ -210,7 +210,8 @@ def test_a_contradiction_at_the_summary_reopens_only_that_answer():
     state, turns = converse(SINGLE, extra={"confirm": ["No, my date of birth is wrong"]})
     slots = [t["slot"] for t in turns]
     assert slots[-3:] == ["confirm", "dob", "confirm"]  # summary, the one fix, summary again
-    strip = lambda f: {k: v for k, v in f.items() if k not in ("_turns", "_last_activity_at")}  # noqa: E731
+    # the answer history differs by design: it records the fix (tests/test_memory.py)
+    strip = lambda f: {k: v for k, v in f.items() if k not in ("_turns", "_last_activity_at", "_answer_history")}  # noqa: E731
     assert strip(state["intake"]) == strip(plain["intake"])  # nothing else was lost on the way
 
 
