@@ -23,18 +23,18 @@ COMMON_WRITES = frozenset({"handoffs", "events", "token_log", "mailbox", "hitl_l
 WRITES: dict[str, frozenset[str]] = {
     "orchestrator": frozenset({"next_agent", "computation_version", "status", "loop_guard_tripped", "escalations", "extraction_done", "revise_target", "blocking_review"}),
     "intake": frozenset({"intake", "intake_complete", "intake_cursor", "messages", "escalations", "documents_in"}),
-    "extraction": frozenset({"extracted", "extraction_done"}),
+    "extraction": frozenset({"extracted", "extraction_done", "recompute_stage"}),
     "eligibility": frozenset({"eligibility", "escalations", "recompute_stage", "human_edit"}),
     "computation": frozenset({"lines", "provenance", "computation_version", "computation_notes", "escalations", "recompute_stage", "human_edit"}),
     "review": frozenset({"review_history", "review_round", "review_passed", "revise_target", "revise_reasons", "recompute_stage", "blocking_review"}),
-    "escalation": frozenset({"escalations", "pending_escalation_id", "intake", "eligibility", "review_passed", "revise_target", "halted_reason", "status", "loop_guard_tripped", "review_round", "lines", "provenance", "provenance_seal", "blocking_review", "human_edit", "recompute_stage", "resolution_request"}),
+    "escalation": frozenset({"escalations", "pending_escalation_id", "intake", "eligibility", "review_passed", "revise_target", "halted_reason", "status", "loop_guard_tripped", "review_round", "lines", "provenance", "provenance_seal", "blocking_review", "human_edit", "recompute_stage", "resolution_request", "document_overrides"}),
     "resolution_check": frozenset({"resolution_request", "escalations", "blocking_review", "loop_guard_tripped"}),
     "finalize": frozenset({"status", "halted_reason", "provenance_seal"}),  # the seal is security/integrity.py's, written as the draft completes
 }
 
 READS: dict[str, tuple[str, ...]] = {
     "intake": ("intake", "intake_cursor", "documents_in", "escalations", "messages"),
-    "extraction": ("documents_in",),
+    "extraction": ("documents_in", "document_overrides"),
     "eligibility": ("intake", "extracted", "extraction_done", "escalations"),
     "computation": ("intake", "eligibility", "extracted", "computation_version"),
     "review": ("lines", "provenance", "eligibility", "extracted", "intake", "escalations", "review_round"),

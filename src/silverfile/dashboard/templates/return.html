@@ -13,7 +13,7 @@
     <div class="links">
       {% if can("view_draft") %}
       <a class="button" href="/returns/{{ rid }}/form">Draft form</a>
-      <a class="button" href="/returns/{{ rid }}/form.pdf">PDF</a>
+      <a class="button" href="/returns/{{ rid }}/form.pdf">Official 1040-SR draft PDF</a>
       <a class="button" href="/returns/{{ rid }}/state.json">state.json</a>
       {% endif %}
       {% if auto_refresh and can("advance_return") %}<form method="post" action="/returns/{{ rid }}/run" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="button" type="submit">Advance</button></form>{% endif %}
@@ -44,7 +44,7 @@
     <span class="muted small">(for a taxpayer who lost theirs; the old code stops working)</span>
     {% endif %}
     {% elif state.status == "complete" %}
-    <p class="done">Draft complete.{% if can("view_draft") %} <a href="/returns/{{ rid }}/form">Open the draft form</a> or the <a href="/returns/{{ rid }}/form.pdf">PDF</a>.{% endif %}</p>
+    <p class="done">Draft complete.{% if can("view_draft") %} <a href="/returns/{{ rid }}/form.pdf">Open the official 1040-SR draft</a> or <a href="/returns/{{ rid }}/form">review lines and sources</a>.{% endif %}</p>
     {% elif state.status == "halted" %}
     <p class="halt">Halted: {{ state.halted_reason or "a Kushim preparer takes it from here." }}</p>
     {% endif %}
@@ -79,6 +79,7 @@
         <label>Other facts to correct (JSON object, optional)
           <textarea id="facts-patch-input" name="facts_patch" rows="3" placeholder='{"estimated_payments": 500}'{% if facts_patch_error %} aria-invalid="true" aria-describedby="facts-patch-error" autofocus{% endif %}>{{ form_values.get('facts_patch', '') }}</textarea>
         </label>
+        <p class="muted small">This editor changes intake facts such as estimated payments. Document box values such as W-2 wages use <a href="#document-transcription-review">Document transcription review</a> below, with its own source-field editor and correction button.</p>
         {% if facts_patch_error %}<p id="facts-patch-error" class="error" role="alert">{{ facts_patch_error }}</p>{% endif %}
         <div class="actions">
           <button type="submit" name="action" value="continue" class="button primary">Continue and verify</button>
@@ -101,6 +102,7 @@
     </section>
     {% endif %}
 
+    {% include "document_review.html" %}
     {% if state.blocking_review or state.human_edit or state.hitl_log %}
     <section class="card">
       <h2>Human review workflow</h2>
@@ -191,7 +193,7 @@
         {% for l in ("11a", "15", "16", "24", "33", "34", "37") %}<tr><td>{{ l }}</td><td>{{ state.provenance[l].label if l in state.provenance else l }}</td><td class="num">{{ state.lines[l] | money }}</td></tr>{% endfor %}
         </tbody>
       </table>
-      <p class="muted small">Every amount's provenance is on the <a href="/returns/{{ rid }}/form">draft form</a>.</p>
+      <p class="muted small">Every amount's provenance is in the <a href="/returns/{{ rid }}/form">interactive review</a> and the official draft PDF's linked appendix.</p>
     </section>
     {% endif %}
   </div>

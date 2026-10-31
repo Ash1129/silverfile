@@ -145,7 +145,11 @@ def _read_image(doc: DocumentInput, path: str, media: str | None = None) -> tupl
 def extract_document_node(payload: dict[str, Any]) -> dict[str, Any]:
     """LangGraph node for one Send() branch. `payload` carries {"document": DocumentInput}."""
     doc: DocumentInput = payload["document"]
-    rec = extract_one(doc)
+    if payload.get("override"):
+        from ..reconciliation import corrected_record
+        rec = corrected_record(doc, payload["override"])
+    else:
+        rec = extract_one(doc)
     ev = {"agent": "extraction", "model": rec.get("method", ""), "purpose": f"extract {rec.get('kind')} {rec.get('id')}", "tokens_in": rec.get("tokens_in", 0), "tokens_out": rec.get("tokens_out", 0), "at": now_iso()}
     events = [f"extraction: {rec['id']} -> {rec['kind']} via {rec['method']} ({len(rec['issues'])} issues)"]
     if rec.get("security_flags"):

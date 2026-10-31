@@ -121,7 +121,12 @@ def _drive(g, cfg, script: list[str], documents, *, on_slot=None):
         payload = pending[0]
         seen.append(payload)
         if payload["type"] == "escalation":
-            g.invoke(Command(resume={"action": "continue", "resolved_by": "test-reviewer", "note": "noted for the preparer"}), cfg)
+            resolution = {"action": "continue", "resolved_by": "test-reviewer", "note": "noted for the preparer"}
+            if payload["escalation"]["kind"] == "uncertain_fact":
+                # The fixture confirms these facts; active intake questions are a separate integration.
+                resolution.update(note="Preparer confirmed the fixture's deduction-chart facts.",
+                                  facts_patch={"dual_status_alien": False})
+            g.invoke(Command(resume=resolution), cfg)
             continue
         if on_slot and on_slot(payload):
             continue
@@ -221,8 +226,8 @@ def test_plain_case1_conversation_matches_the_prefilled_numbers(case1_answers):
     g.invoke(new_return_state("plain", []), cfg)
     seen = _drive(g, cfg, case1_answers, case1_document_list())
     state = g.get_state(cfg).values
-    assert [p["type"] for p in seen].count("escalation") == 0
-    assert len(seen) == len(case1_answers)  # one interrupt per answer
+    assert [p["escalation"]["kind"] for p in seen if p["type"] == "escalation"] == ["uncertain_fact"]
+    assert len(seen) == len(case1_answers) + 1  # one answer per question plus explicit staff confirmation
     assert state["status"] == "complete"
     assert state["lines"]["15"] == 22_898.01 and state["lines"]["16"] == 2_509.26
     assert state["intake"].get("volunteered_ssn_events", []) == []

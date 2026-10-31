@@ -11,7 +11,7 @@ from ..provenance import now_iso
 from ..security import pii, validate
 from ..state import ReturnState
 
-HUMAN_ACTIONS = ("continue", "halt", "accept", "start_edit", "save_edit", "complete_edit", "resolve_review", "save_intervention_note", "append_intervention_note")
+HUMAN_ACTIONS = ("continue", "halt", "accept", "start_edit", "save_edit", "complete_edit", "correct_document", "resolve_review", "save_intervention_note", "append_intervention_note")
 
 
 def requirement(code: str, description: str, **extra: Any) -> dict[str, Any]:
@@ -79,6 +79,8 @@ def _patched_facts(facts: dict[str, Any], patch: dict[str, Any]) -> dict[str, An
     facts["_unknown_fields"] = [k for k in facts.get("_unknown_fields", []) if not confirmed(k)]
     if patch.get("filing_status"):
         facts.pop("_filing_status_unsure", None)
+    if "dependents" in patch:
+        facts["_dependents_done"] = True
     return facts
 
 
@@ -129,6 +131,33 @@ def escalation_node(state: ReturnState) -> dict[str, Any]:
     if action == "halt":
         out.update(escalations=[_resolved(esc, resolution)], status="halted", halted_reason=f"{esc['kind']}: {note or 'taken over by a Kushim employee'}", resolution_request=None, recompute_stage=None)
         out["hitl_log"].append(log_entry("human_handoff", result="yes", escalation_id=esc["id"], actor=actor, note=note))
+        return out
+    if action == "correct_document":
+        from ..reconciliation import clean_document_patch, source_key
+        try:
+            correction = clean_document_patch(payload.get("document_patch"), state)
+        except ValueError as exc:
+            return blocked([requirement("valid_document_correction", str(exc))])
+        if patch or (state.get("human_edit") or {}).get("status") == "editing":
+            return blocked([requirement("complete_edit_first", "Complete the current facts edit before correcting a document.")])
+        key = correction["document_id"]
+        original = state["extracted"][key]
+        source = next(d for d in state.get("documents_in") or [] if d["id"] == key)
+        override = {"fields": {**original["fields"], **correction["fields"]}, "original_record": original,
+                    "source_key": source_key(source), "evidence": correction["evidence"], "actor": actor,
+                    "at": now_iso(), "previous_version": original["version"], "superseded_by": correction.get("superseded_by")}
+        # One snapshot of the original record is enough; do not nest previous work orders.
+        override["original_record"] = (state.get("document_overrides") or {}).get(key, {}).get("original_record", original)
+        out.update(document_overrides={**(state.get("document_overrides") or {}), key: override},
+                   lines={}, provenance={}, provenance_seal=None, eligibility={}, review_passed=False, review_round=0, revise_target=None,
+                   human_edit={"id": f"document-edit:{key}:{len(state.get('hitl_log') or [])}", "escalation_id": esc["id"], "status": "completed", "facts_patch": {}, "completed_by": actor, "completed_at": override["at"]},
+                   recompute_stage="extraction", resolution_request={"escalation_id": esc["id"], "kind": esc["kind"], "action": action, "resolution": {**resolution, "document_patch": correction}})
+        if event:
+            out["blocking_review"] = {**event, "status": "open", "intervention_note": "", "note_draft": None,
+                                      "required_actions": [{**a, "status": "pending"} for a in event.get("required_actions", [])]}
+        out["hitl_log"].append(log_entry("document_correction_requested", actor=actor, document_id=key,
+                                       previous_version=original["version"], old_values={k: original["fields"].get(k) for k in correction["fields"]},
+                                       new_values=correction["fields"], evidence=correction["evidence"], superseded_by=correction.get("superseded_by")))
         return out
     if action in ("save_intervention_note", "append_intervention_note"):
         todo = accept_requirements(view, require_note=False)
@@ -192,6 +221,8 @@ def escalation_node(state: ReturnState) -> dict[str, Any]:
         if previous.get("status") != "editing" or previous.get("escalation_id") != esc["id"]:
             previous = {}
         patch = _merge_patch(previous.get("facts_patch") or {}, patch)
+        if "document_claims" in patch and not note:
+            return blocked([requirement("claim_correction_evidence", "A source-linked claim correction needs a written evidence explanation.")])
         resolution["facts_patch"] = patch
         out["intake"] = _patched_facts(state.get("intake") or {}, patch)
         out.update(lines={}, provenance={}, provenance_seal=None, eligibility={}, review_passed=False, review_round=0, revise_target=None)
@@ -200,6 +231,8 @@ def escalation_node(state: ReturnState) -> dict[str, Any]:
             out["blocking_review"] = {**event, "status": "open", "intervention_note": "", "note_draft": None, "required_actions": [{**a, "status": "pending"} for a in event.get("required_actions", [])]}
         out["recompute_stage"] = "eligibility" if state.get("intake_complete") and state.get("extraction_done") else None
         out["hitl_log"].append(log_entry("human_edit_completed", actor=actor, escalation_id=esc["id"], changed_fields=sorted(patch), previous_computation_version=state.get("computation_version", 0), recomputation="queued" if out["recompute_stage"] else "after_intake"))
+        if "document_claims" in patch:
+            out["hitl_log"].append(log_entry("document_claims_corrected", actor=actor, old_claims=(state.get("intake") or {}).get("document_claims"), new_claims=patch["document_claims"], evidence=note))
     out["resolution_request"] = {"escalation_id": esc["id"], "kind": esc["kind"], "action": action, "resolution": resolution}
     return out
 
@@ -275,7 +308,13 @@ def after_remediation_step(agent: str, state: ReturnState, update: dict[str, Any
     """Advance the explicit recomputation state once per worker completion."""
     stage = state.get("recompute_stage")
     edit = state.get("human_edit") or {}
-    if stage == "eligibility" and agent == "eligibility":
+    if stage == "extraction" and agent == "extraction" and update.get("extraction_done"):
+        update["recompute_stage"] = "eligibility"
+        key = ((state.get("resolution_request") or {}).get("resolution") or {}).get("document_patch", {}).get("document_id")
+        record = (state.get("extracted") or {}).get(key, {})
+        update["hitl_log"] = [log_entry("document_correction_applied", result="yes", document_id=key,
+                                        version=record.get("version"), correction=record.get("correction"), superseded_by=record.get("superseded_by"))]
+    elif stage == "eligibility" and agent == "eligibility":
         todo = _safety_requirements({**state, **update})
         update["recompute_stage"] = None if todo else "computation"
         if todo:

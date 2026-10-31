@@ -18,6 +18,7 @@ from ..state import Provenance, ReturnState
 from ..tax_math.client import TaxMathClient
 from ..security.validate import unknown_fact_actions
 from ..provenance import now_iso
+from ..reconciliation import active_documents, evidence_conflicts
 
 
 def _num(v: Any) -> float:
@@ -33,11 +34,14 @@ def _num(v: Any) -> float:
 
 
 def _docs_of(state: ReturnState, kind: str) -> list[dict[str, Any]]:
-    return [d for d in (state.get("extracted") or {}).values() if (d.get("kind") or "").upper() == kind and not d.get("out_of_scope")]
+    return [d for d in active_documents(state).values() if (d.get("kind") or "").upper() == kind and not d.get("out_of_scope")]
 
 
 def run_computation(state: ReturnState) -> dict[str, Any]:
-    unknown = unknown_fact_actions(state)
+    conflicts = evidence_conflicts(state)
+    if conflicts:
+        return {"escalations": [{"id": "esc-computation-conflict", "kind": "conflict", "reason": "Source-linked monetary conflicts remain unresolved.", "raised_by": "computation", "raised_at": now_iso(), "details": {"conflicts": conflicts}, "status": "open"}], "handoffs": ["computation"], "events": ["computation blocked: conflicting evidence"]}
+    unknown = unknown_fact_actions(state, require_chart_facts=True)
     if unknown:
         return {"escalations": [{"id": "esc-computation-unknown", "kind": "uncertain_fact", "reason": "Required computation inputs are unknown.", "raised_by": "computation", "raised_at": now_iso(), "details": {"required_actions": unknown}, "status": "open"}], "handoffs": ["computation"], "events": ["computation blocked: required facts are unknown"]}
     facts = state.get("intake", {}) or {}
@@ -55,6 +59,8 @@ def run_computation(state: ReturnState) -> dict[str, Any]:
     with TaxMathClient() as tm:
         def put(line: str, amount: float, **kw: Any) -> float:
             lines[line] = float(amount)  # tools return cents-rounded values already
+            if kw.get("source_kind") == "document":
+                kw["inputs"] = {**kw.get("inputs", {}), "document_versions": {key: state["extracted"][key].get("version") for key in kw.get("sources", [])}}
             prov[line] = record(line, amount, **kw)
             return lines[line]
 

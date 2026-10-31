@@ -154,11 +154,15 @@ def route(state: ReturnState):
     nxt = state.get("next_agent") or decide_next(state)
     if nxt == "extraction":
         docs = state.get("documents_in") or []
+        correction_id = ((state.get("resolution_request") or {}).get("resolution") or {}).get("document_patch", {}).get("document_id")
+        if state.get("recompute_stage") == "extraction" and correction_id:
+            docs = [d for d in docs if d["id"] == correction_id]
         version = 1 + max([int(d.get("version", 1)) for d in (state.get("extracted") or {}).values()] or [0]) if state.get("extracted") else 1
         if not docs:
             return "aggregate_extraction"
         req = latest_request(state, "extraction")  # posted by orchestrator_node just before this edge runs
-        return [Send("extract_document", {"document": {**d, "version": version}, "request": req}) for d in docs]
+        return [Send("extract_document", {"document": {**d, "version": version}, "request": req,
+                                          "override": (state.get("document_overrides") or {}).get(d["id"])}) for d in docs]
     if nxt in ("loop_guard", "review_unresolved"):
         return "orchestrator"  # the node already recorded the escalation; re-route to it
     if nxt == "end":

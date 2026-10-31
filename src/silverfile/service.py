@@ -366,6 +366,15 @@ def resolve(return_id: str, resolution: dict[str, Any], *, actor: Principal, int
                 res["facts_patch"] = validate.clean_facts_patch(patch)
             except ValueError as e:
                 raise FactsPatchError(str(e)) from e
+        if action == "correct_document":
+            from .reconciliation import clean_document_patch
+            try:
+                current = get_state(return_id)
+                if res.get("facts_patch") or (current.get("human_edit") or {}).get("status") == "editing":
+                    raise ValueError("Complete the current facts edit before submitting a separate document correction.")
+                res["document_patch"] = clean_document_patch(resolution.get("document_patch"), current)
+            except ValueError as exc:
+                raise FactsPatchError(str(exc)) from exc
         res["resolved_by"] = ((resolution or {}).get("resolved_by") or actor.subject) if actor.kind == "system" else actor.subject
         res["resolved_by_role"] = actor.role
         res = {k: v for k, v in res.items() if v not in (None, "")}
@@ -375,6 +384,25 @@ def resolve(return_id: str, resolution: dict[str, Any], *, actor: Principal, int
 def get_state(return_id: str) -> dict[str, Any]:
     """The ReturnState dict as the graph holds it (messages are LangChain message objects)."""
     return dict(_snapshot(return_id).values)
+
+
+def original_document(return_id: str, document_id: str, *, actor: Principal) -> tuple[bytes, str]:
+    """An authenticated preparer can inspect the immutable source before correcting it."""
+    _require(actor, return_id, "resolve_escalation")
+    document = next((d for d in get_state(return_id).get("documents_in") or [] if d["id"] == document_id), None)
+    if document is None:
+        raise ServiceError("No such source document on this return.")
+    document = _trusted_document(document)
+    if document.get("payload"):
+        content, media = json.dumps(pii.redact_deep(document["payload"]), indent=2).encode(), "application/json"
+    else:
+        path = Path(document["path"])
+        media = document.get("media_type") or {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".pdf": "application/pdf", ".json": "application/json"}.get(path.suffix.lower())
+        if media not in {"image/jpeg", "image/png", "application/pdf", "application/json"}:
+            raise ServiceError("This source format cannot be downloaded.")
+        content = uploads.read_bytes(path)
+    audit.record("source_document_viewed", actor=actor.label, return_id=return_id, document=document_id)
+    return content, media
 
 
 def state_json(return_id: str) -> dict[str, Any]:

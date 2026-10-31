@@ -37,7 +37,7 @@ All rule constants live in `tax_math/rules.py` with a `REF-*` citation to the br
 ## 4. Known gaps
 
 - Docker is included and untested locally: no Docker daemon on the development machine.
-- The form renders to HTML (and a text-positioned PDF) rather than onto the official IRS PDF; the line numbering follows the 2025 1040-SR.
+- PDF export fills the supplied official 2025 IRS Form 1040-SR and appends provenance records; HTML retains the interactive review. The PDF remains a masked, unsigned draft. Uncollected address, bank and election fields stay blank; see `docs/OFFICIAL_PDF.md` for coverage and verification.
 - The `chat` dashboard page is a plain form, not a voice or large-type interface. The intake copy was written for reading aloud, but no usability test was run with older taxpayers.
 - Vision extraction is tested on synthetic images only. Real scans will need the confidence threshold tuned and probably a second pass on low-confidence fields.
 - Eval cases are the four fixtures plus the batch set. A wider set of edge cases (MFS, dependents with SSNs, partial-year Social Security) is the obvious next step.

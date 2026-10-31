@@ -13,6 +13,8 @@
  "filing_status": "single",
  "dependents": [],
  "can_be_claimed_as_dependent": false,
+ "dual_status_alien": false,
+ "mfs_spouse_itemizes": false,
  "documents_declared": [
   "W-2",
   "SSA-1099",

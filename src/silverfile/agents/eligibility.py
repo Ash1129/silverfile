@@ -16,7 +16,8 @@ from typing import Any
 from ..provenance import now_iso
 from ..state import Escalation, EligibilityResult, ReturnState
 from ..security.capabilities import tools_for
-from ..security.validate import unknown_fact_actions
+from ..security.validate import chart_confirmation_fields, unknown_fact_actions
+from ..reconciliation import active_documents, evidence_conflicts
 
 tm = tools_for("eligibility")  # only is_1040sr_eligible, count_12d_boxes and FILING_STATUSES
 
@@ -52,7 +53,7 @@ def _esc(kind: str, reason: str, details: dict[str, Any] | None = None) -> Escal
 
 def run_eligibility(state: ReturnState) -> dict[str, Any]:
     facts = state.get("intake", {}) or {}
-    docs = state.get("extracted", {}) or {}
+    docs = active_documents(state)
     tp = facts.get("taxpayer", {}) or {}
     sp = facts.get("spouse") or {}
     fs = facts.get("filing_status")
@@ -61,8 +62,8 @@ def run_eligibility(state: ReturnState) -> dict[str, Any]:
     escalate: list[dict[str, Any]] = []
     out_of_scope: list[str] = []
     conflicts: list[str] = []
-    for requirement in unknown_fact_actions(state):
-        escalate.append({"kind": "uncertain_fact", "reason": requirement["description"], "citation": "REF-ES-1"})
+    for requirement in unknown_fact_actions(state, require_chart_facts=True):
+        escalate.append({"kind": "uncertain_fact", "reason": requirement["description"], "citation": requirement.get("citation", "REF-ES-1"), "required_actions": [requirement]})
 
     def det(claim: str, result: Any, cite: str) -> None:
         dets.append({"claim": claim, "result": result, "citation": cite})
@@ -97,9 +98,9 @@ def run_eligibility(state: ReturnState) -> dict[str, Any]:
         det("Boxes checked on line 12d", count, "REF-SD-3")
 
     # 4. Chart applies? (REF-SD-4)
-    chart_applies = True
+    chart_applies = None if any(type(facts.get(k)) is not bool for k in chart_confirmation_fields(facts)) else True
     for flag, why in (("can_be_claimed_as_dependent", "the taxpayer can be claimed as a dependent"), ("mfs_spouse_itemizes", "a separately filing spouse itemises"), ("dual_status_alien", "the taxpayer was a dual-status alien")):
-        if facts.get(flag):
+        if facts.get(flag) is True and (flag != "mfs_spouse_itemizes" or fs == "mfs"):
             chart_applies = False
             escalate.append({"kind": "chart_not_applicable", "reason": f"The Standard Deduction Chart does not apply because {why}.", "citation": "REF-SD-4"})
     det("Standard Deduction Chart applies", chart_applies, "REF-SD-4")
@@ -145,6 +146,10 @@ def run_eligibility(state: ReturnState) -> dict[str, Any]:
                 conflicts.append(f"Document {d.get('id')} is in the name {name!r}, which does not match the taxpayer or spouse.")
     for c in conflicts:
         escalate.append({"kind": "conflict", "reason": c, "citation": "REF-ES-1"})
+    for conflict in evidence_conflicts(state):
+        conflicts.append(conflict["summary"])
+        escalate.append({"kind": "conflict", "reason": f"{conflict['summary']} [{conflict['id']}]", "citation": "REF-ES-1",
+                         "details": {"conflict": conflict, "required_actions": [{"code": conflict["code"], "description": conflict["required_action"], "status": "pending"}]}})
 
     # 7. Third-party / exploitation signals surfaced by intake (REF-ES-1 #6)
     if facts.get("answering_party") == "third_party_no_authority":
@@ -173,7 +178,7 @@ def run_eligibility(state: ReturnState) -> dict[str, Any]:
     seen = {(e.get("kind"), e.get("reason")) for e in state.get("escalations", [])}
     for e in escalate:
         if (e["kind"], e["reason"]) not in seen:
-            new_escalations.append(_esc(e["kind"], e["reason"], {"citation": e.get("citation")}))
+            new_escalations.append(_esc(e["kind"], e["reason"], {"citation": e.get("citation"), **e.get("details", {}), **({"required_actions": e["required_actions"]} if e.get("required_actions") else {})}))
     return {
         "eligibility": result,
         "escalations": new_escalations,

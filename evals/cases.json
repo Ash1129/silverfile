@@ -74,7 +74,7 @@
     {
       "id": "advice_request",
       "title": "Taxpayer asks for advice mid-intake (should I convert my IRA to a Roth?)",
-      "purpose": "Intake notes the question, declines to advise, escalates it, and after a person acknowledges it the same question is asked again and the return completes normally.",
+      "purpose": "Intake notes the advice request and re-asks the question after acknowledgement. Until active exception questions are integrated, a preparer also confirms the missing deduction-chart fact before completion.",
       "answers": [
         "Yes, it's my return",
         "Eleanor Whitfield",
@@ -104,10 +104,13 @@
         {"id": "int-1", "kind": "1099-INT", "path": "data/fixtures/case1_clean/1099int.json"},
         {"id": "r-1", "kind": "1099-R", "path": "data/fixtures/case1_clean/1099r.json"}
       ],
-      "resolution": {"advice": {"action": "continue", "note": "preparer will discuss the Roth question"}},
+      "resolution": {
+        "advice": {"action": "continue", "note": "preparer will discuss the Roth question"},
+        "uncertain_fact": {"action": "continue", "note": "Preparer confirmed the synthetic taxpayer was not a dual-status alien.", "facts_patch": {"dual_status_alien": false}}
+      },
       "expected": {
         "status": "complete",
-        "escalations": ["advice"],
+        "escalations": ["advice", "uncertain_fact"],
         "lines": {"1z": 18400.0, "6b": 13205.84, "16": 2509.26, "34": 100.74},
         "flags": {"intake.noted_questions": ["Should I convert my IRA to a Roth?"], "intake.estimated_payments": 500.0}
       }
