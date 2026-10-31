@@ -286,7 +286,7 @@ Seven people, one focus area each. Each role has a design note or section in `do
 | Ashwin (Ash) | MLOps / DevOps: the first working graph, deployment, evals and metrics | `src/silverfile/`, `Dockerfile`, `render.yaml`, `docs/metrics.md` |
 | Sasha | Security | `docs/THREAT_MODEL.md`, `src/silverfile/security/`, `src/silverfile/keysetup.py`, `tests/security/` |
 | Ishaan | Inter-agent communication | `src/silverfile/comms/`, `docs/INTER_AGENT_COMMUNICATION.md`, `tests/test_comms.py` |
-| Daniel | Agent memory | `src/silverfile/memory.py`, context handling and the `--no-context-strategy` measurement |
+| Daniel | Agent memory: resume recap, answer history, context window | `docs/AGENT_MEMORY.md`, `src/silverfile/memory.py`, `tests/test_memory.py`, the `--no-context-strategy` measurement |
 | Tony (Guardrails A) | Guardrails and ethics: escalations and human review | `src/silverfile/agents/escalation.py`, `tests/test_escalations.py`, `tests/security/test_sec_hitl.py` |
 | Gabriel (Guardrails B) | Guardrails and ethics: intake dignity | `docs/INTAKE_DIGNITY.md`, `tests/test_intake_dignity.py`, `demo/eval_case_1.md` |
 | Mahika | Task division and management: the Orchestrator, routing, parallel branch, review bound, loop guard, graph diagram | `docs/ORCHESTRATION.md`, `docs/graph.mmd`, `tests/test_routing_table.py`, `tests/test_orchestration_flow.py` |
