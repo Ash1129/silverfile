@@ -233,3 +233,63 @@ def test_document_box_in_facts_form_points_to_the_separate_source_editor(web):
 def test_claim_validation_rejects_ambiguous_or_untyped_inputs(claim):
     with pytest.raises(ValueError):
         clean_claims(claim)
+
+
+@pytest.mark.parametrize("kind, expected", [
+    ("W-2", {"wages", "federal_withheld"}),
+    ("SSA-1099", {"net_benefits", "federal_withheld"}),
+    ("1099-R", {"gross_distribution", "taxable_amount", "taxable_not_determined", "ira_sep_simple", "qcd_amount", "federal_withheld"}),
+    ("1099-INT", {"interest_income", "tax_exempt_interest", "federal_withheld"}),
+    ("1099-DIV", {"ordinary_dividends", "qualified_dividends", "federal_withheld"}),
+])
+def test_missing_document_keys_block_computation_before_tool_calls(kind, expected, monkeypatch):
+    from silverfile.agents import computation
+    def forbidden_tool():
+        pytest.fail("Unknown document amounts must be escalated before tools run.")
+    monkeypatch.setattr(computation, "TaxMathClient", forbidden_tool)
+    out = run_computation({"intake": service.fixture_intake("case1_clean"), "extracted": {"unreadable": {"kind": kind, "fields": {}}}})
+    assert "lines" not in out
+    escalation = out["escalations"][0]
+    assert escalation["kind"] == "uncertain_fact"
+    assert {action["field"] for action in escalation["details"]["required_actions"]} == {f"document:unreadable:{key}" for key in expected}
+
+
+def test_unreadable_w2_after_legacy_eligibility_can_be_confirmed_and_exported(web, monkeypatch):
+    import io
+    from pypdf import PdfReader
+    from silverfile.agents import eligibility
+    from silverfile.forms.official import field
+    from webhelpers import interrupt_id, staff_client, token
+    rid = service.new_return_id()
+    upload = service.save_upload(rid, "w2.jpg", service.DEMO_W2_IMAGE.read_bytes(), actor=SYSTEM)
+    facts = {**service.fixture_intake("case1_clean"), "documents_declared": ["W-2"]}
+    service.create_return([upload], facts, return_id=rid, actor=SYSTEM)
+    # Reproduce the user's saved pre-fix eligibility result. Computation must
+    # still reject the empty record, then permit an audited source repair.
+    with monkeypatch.context() as legacy:
+        legacy.setattr(eligibility, "unknown_fact_actions", lambda *args, **kwargs: [])
+        out = service.run(rid)
+    assert out["status"] == "waiting_human" and not out["lines"]
+    assert service.pending(rid)["escalation"]["id"] == "esc-computation-unknown"
+    assert out["extracted"][upload["id"]]["fields"] == {}
+    assert "offline mode and no sidecar" in out["extracted"][upload["id"]]["issues"][0]
+    client, _ = staff_client(web, "unreadable-document-reviewer")
+    page = client.get(f"/returns/{rid}")
+    assert "Document transcription review" in page.text and "federal_withheld" in page.text
+    assert client.get(f"/returns/{rid}/documents/{upload['id']}/source").status_code == 200
+    response = client.post(f"/returns/{rid}/document-correction", data={
+        "csrf_token": token(page.text), "interrupt_id": interrupt_id(page.text),
+        "document_id": upload["id"], "expected_version": out["extracted"][upload["id"]]["version"],
+        "fields_json": '{"wages":18400,"federal_withheld":1210}',
+        "evidence": "Inspected the original synthetic W-2; Box 1 is 18400 and Box 2 is 1210.",
+    }, follow_redirects=False)
+    assert response.status_code == 303
+    final = service.get_state(rid)
+    assert final["status"] == "complete" and final["review_passed"], [(e["kind"], e["reason"]) for e in final["escalations"] if e["status"] == "open"]
+    assert final["lines"]["1z"] == 18400 and final["lines"]["25a"] == 1210
+    assert final["extracted"][upload["id"]]["method"] == "staff-transcription"
+    assert final["documents_in"] == out["documents_in"]
+    pdf = client.get(f"/returns/{rid}/form.pdf")
+    assert pdf.status_code == 200 and pdf.headers["content-type"].startswith("application/pdf")
+    reader = PdfReader(io.BytesIO(pdf.content))
+    assert reader.get_fields()[field(1, "f1_57[0]")]["/V"] == "18,400.00"

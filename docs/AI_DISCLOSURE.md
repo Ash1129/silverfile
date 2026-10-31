@@ -40,6 +40,8 @@ No real taxpayer data was used at any point.
 
 The official-form export revision used Codex to inspect the supplied PDF's AcroForm and widgets, implement an explicit 2025 field map and source-appendix links, and add logical-field and appearance regressions. Poppler renders of both synthetic demonstrations were visually checked; this caught checkbox and masked-identifier appearance issues that field-value tests alone did not detect. The original supplied template is preserved as a packaged asset. No tax rules were added or recalculated in the renderer, and uncollected facts remain blank.
 
+A later manual test exposed an unreadable uploaded W-2 with an empty field record: computation raised an error while the page retained its saved Computing status. Codex extended required-document validation to check absent source boxes against the form schema before tool calls, added regressions for all five supported document kinds and audited staff correction through official PDF export, and isolated test admin credentials from the local .env. The full offline Windows Python 3.13.15 run passed 620 tests with one POSIX-only skip. The user completed manual acceptance before authorizing publication of this fix.
+
 The explicit blocking-review, human-edit completion, deterministic continuation check and unknown-fact controls were implemented with Codex from the human-specified requirements. Verification used the offline pytest suite, ten existing evaluation cases, a bounded long-note transfer check and synthetic preview data. The working files, environments and validation logs are kept in the Git-ignored `agent_workspace/` directory. No real taxpayer data was used, and no commit was created by the agent.
 
 ### Inter-agent communication (Ishaan Vora)

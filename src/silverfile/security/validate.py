@@ -97,15 +97,20 @@ def unknown_fact_actions(state: dict[str, Any], *, require_chart_facts: bool = F
             unknown.add(f"{person}.blind")
     if facts.get("answering_party") == "unknown":
         unknown.add("answering_party")
+    from ..agents.extraction import SCHEMAS
     from ..reconciliation import active_documents
+    required_amounts = {"wages", "net_benefits", "gross_distribution", "taxable_amount", "qcd_amount", "interest_income", "tax_exempt_interest", "ordinary_dividends", "qualified_dividends", "federal_withheld"}
     for doc_id, doc in active_documents(state).items():
         fields = doc.get("fields") or {}
         if doc.get("kind") == "1099-R":
             for key in ("taxable_not_determined", "ira_sep_simple"):
                 if fields.get(key) is None:
                     unknown.add(f"document:{doc_id}:{key}")
-        for key, value in fields.items():
-            if value is None and key in {"wages", "net_benefits", "gross_distribution", "taxable_amount", "qcd_amount", "interest_income", "tax_exempt_interest", "ordinary_dividends", "qualified_dividends", "federal_withheld"}:
+        # An unreadable document can have no keys at all. Check its expected
+        # monetary boxes as well as present keys before computation is entered.
+        expected = set(SCHEMAS.get(doc.get("kind"), {})) | set(fields)
+        for key in expected & required_amounts:
+            if fields.get(key) is None:
                 if key != "taxable_amount" or fields.get("taxable_not_determined") is not True:
                     unknown.add(f"document:{doc_id}:{key}")
     return [{"code": "confirm_unknown_fact", "field": key, "description": f"Confirm {key} from evidence; unknown is not zero or no.", "status": "pending", **({"citation": "REF-SD-4"} if key in chart_confirmation_fields(facts) else {})} for key in sorted(unknown)]

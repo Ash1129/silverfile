@@ -24,7 +24,9 @@ os.environ["SILVERFILE_DATA_KEY"] = "test-only-data-key-not-a-secret-0123456789"
 os.environ.pop("SILVERFILE_ENV", None)
 # never the checkout's own data/runtime: tests that need a fresh one still set their own
 os.environ["SILVERFILE_DATA_DIR"] = tempfile.mkdtemp(prefix="silverfile-tests-")
-os.environ.pop("SILVERFILE_ADMIN_PASSWORD", None)
+# A real local .env must not bootstrap accounts with non-test credentials.
+os.environ["SILVERFILE_ADMIN_USER"] = ""
+os.environ["SILVERFILE_ADMIN_PASSWORD"] = ""
 
 from langgraph.types import Command  # noqa: E402
 
