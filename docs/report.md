@@ -117,7 +117,7 @@ Seven people shared six focus areas, with Guardrails and ethics split in two. Th
 
 | Focus area | Person | What they owned | Where to look |
 | --- | --- | --- | --- |
-| Agent memory | Daniel | Saving and resuming a session with a summary of what was covered, and the context-window strategy measured with and without it | `src/silverfile/memory.py`, `docs/metrics.md`, `python run.py batch --no-context-strategy` |
+| Agent memory | Daniel | Saving and resuming a session with a summary of what was covered (the welcome-back recap), the answer history that keeps earlier answers when the taxpayer corrects them, and the context-window strategy measured with and without it | `docs/AGENT_MEMORY.md`, `src/silverfile/memory.py`, `tests/test_memory.py`, `docs/metrics.md`, `python run.py batch --no-context-strategy` |
 | Inter-agent communication | Ishaan | The shared state, the typed message bus, the channel policy and per-agent write contracts, and the reducer for the parallel branch | `src/silverfile/comms/`, `docs/INTER_AGENT_COMMUNICATION.md`, `tests/test_comms.py` |
 | Task division and management | Mahika | The Orchestrator: conditional routing, the parallel extraction branch, the capped review loop, the loop guard and the graph diagram | `docs/ORCHESTRATION.md`, `docs/graph.png`, `tests/test_routing_table.py`, `tests/test_orchestration_flow.py` |
 | MLOps/DevOps | Ash | The repository and setup, the first working graph, deployment, evaluations and metrics, and the Docker container | `Dockerfile`, `render.yaml`, `evals/`, `docs/metrics.md` |
