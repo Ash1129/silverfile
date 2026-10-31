@@ -716,6 +716,15 @@ def run_intake(state: ReturnState) -> dict[str, Any]:
             said = SSN_RE.sub("[number removed]", text)
             # a free-text answer is stored as said, placeholder and all; elsewhere the placeholder would be parsed (as a surname, say)
             text = said if slot in FREE_TEXT_SLOTS else re.sub(r"\s{2,}", " ", SSN_RE.sub(" ", text)).strip()
+    if PRESSURE_RE.search(text) and slot not in ("upload",):
+        # brief §4.4 condition 6: notice and stop, without adjudicating. The words are not echoed back, since
+        # the person who is applying the pressure may be reading the screen: the reply says only that a Kushim
+        # employee will be in touch. The staff-facing reason says to make that contact privately.
+        if not any(e.get("kind") == "exploitation" and e.get("status") == "open" and str(e.get("id", "")).startswith("esc-pressure") for e in [*state.get("escalations", []), *escalations]):
+            escalations.append(Escalation(id=f"esc-pressure-{turns}", kind="exploitation", reason=f"The taxpayer's answer may indicate pressure or coercion: {text.strip()[:200]!r}. Contact the taxpayer privately, not through this screen, before continuing.", raised_by="intake", raised_at=now_iso(), details={"slot": slot}, status="open", resolution=None, resolved_by=None, resolved_at=None))
+        reply.append("Thank you for telling me. I'm going to pause here so that a Kushim employee can get in touch with you directly.")
+        events.append("intake: possible pressure indicated; return paused for a Kushim employee")
+        return _finish(state, facts, slot, question, said, reply, turns, escalations, events, tokens_in, tokens_out, repeat=True)
     if ADVICE_RE.search(text) and slot not in ("upload",):
         facts.setdefault("noted_questions", []).append(text.strip())
         reply.append("That's a question about what would be best for you, which is tax advice, and I'm not able to give advice; I only help gather and copy the figures. I've noted your question for the Kushim preparer, who can talk it through with you.")
@@ -814,3 +823,29 @@ def _finish(state: ReturnState, facts: IntakeFacts, slot: str, question: str, te
         "token_log": [{"agent": "intake", "model": settings().intake_model, "purpose": f"parse {slot}", "tokens_in": tin, "tokens_out": tout, "at": now_iso()}] if tin else [],
         "events": [*events, f"intake: asked {slot}" + (" (complete)" if done else "")],
     }
+
+# (Defined here, after the functions that use it, to keep this change clear of other edits near the top of the file.)
+# Brief §4.4 condition 6 also names "third-party pressure". Someone being made to answer, or to hand over
+# money, may say so in passing and in their own words, at any question. The trigger is a plain statement of
+# being forced, pressured, threatened or made to do this, or of being afraid of a named person; it is
+# deliberately a short list of unambiguous phrases, because an unneeded pause costs a preparer a phone
+# call while a missed one is the failure this condition exists for. "The armed forces", "the labor force"
+# and "I want my refund" do not match.
+PRESSURE_RE = re.compile(
+    # "I am being forced to do this", "he is being threatened", "she has been coerced"
+    r"\b(?:being|been|am|is|are) (?:forced|pressured|pressurised|pressurized|coerced|threatened|blackmailed)\b"
+    # "I was forced into this", "they were pressured to sign" (but not "I was forced to retire")
+    r"|\b(?:was|were) (?:forced|pressured|pressurised|pressurized|coerced|threatened|blackmailed) (?:into|to (?:sign|do this|do it|say|give|hand|send|answer|lie|pay))\b"
+    # "they forced me", "he pressures me", "my son threatened me"
+    r"|\b(?:forced|forcing|force|pressured|pressures|pressuring|coerced|coercing|threatened|threatens|threatening|blackmailed) (?:me|us)\b"
+    # "making me sign", "made me do this", "makes me give them the money"
+    r"|\b(?:made|making|makes) me (?:sign|do this|do it|say|give|hand|send|answer|lie|pay)\b"
+    # "told me what to say", "telling me exactly what to answer"
+    r"|\b(?:told|telling|tells) me (?:exactly )?what to (?:say|answer|write|put|type|do)\b"
+    # "against my will"
+    r"|\bagainst my will\b"
+    # "I'm scared of him", "afraid of my nephew"
+    rf"|\b(?:scared|afraid|frightened|terrified) of (?:him|her|them|my {RELATIVE}|the person)\b"
+    # "they are stealing my refund"
+    r"|\b(?:stealing|steal|stole|stolen) (?:my|the) (?:refund|money|check)\b",
+    re.I)
