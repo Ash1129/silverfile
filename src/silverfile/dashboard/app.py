@@ -480,7 +480,10 @@ def create_app() -> FastAPI:
             if row.get("fixture"):
                 docs = _not_yet_attached(rid, service.fixture_documents(row["fixture"]))
             text = text.strip() or "done"
-        await run_in_threadpool(lambda: service.answer(rid, text, docs or None, actor=me, interrupt_id=interrupt_id or ""))
+        try:
+            await run_in_threadpool(lambda: service.answer(rid, text, docs or None, actor=me, interrupt_id=interrupt_id or ""))
+        except service.Stale:
+            pass  # a double-submitted form: refused and logged; the page shows the current question
         return RedirectResponse("/t", status_code=303)
 
     @app.post("/t/upload")
@@ -490,6 +493,11 @@ def create_app() -> FastAPI:
         ratelimit.ANSWER.hit(me.subject)
         rid = me.subject
         form = await request.form()
+        interrupt_id = str(form.get("interrupt_id") or "")
+        try:
+            service.check_interrupt(rid, interrupt_id)  # before any file is saved
+        except service.Stale:
+            return RedirectResponse("/t", status_code=303)
         pend = service.pending(rid)
         if not pend or pend.get("type") != "upload":
             raise service.ServiceError("The conversation is not at the upload step; answer the current question first.")
@@ -502,7 +510,10 @@ def create_app() -> FastAPI:
             if row.get("fixture"):
                 docs.extend(_not_yet_attached(rid, service.fixture_documents(row["fixture"])))
         text = str(form.get("text") or "").strip() or "done"
-        await run_in_threadpool(lambda: service.answer(rid, text, docs, actor=me, interrupt_id=str(form.get("interrupt_id") or "")))
+        try:
+            await run_in_threadpool(lambda: service.answer(rid, text, docs, actor=me, interrupt_id=interrupt_id))
+        except service.Stale:
+            pass  # answered by a concurrent submit while these files were saved
         return RedirectResponse("/t", status_code=303)
 
     @app.post("/t/leave")

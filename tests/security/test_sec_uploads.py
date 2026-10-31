@@ -123,7 +123,7 @@ def test_stored_under_a_random_name_encrypted_and_never_served(web, data_dir):
         assert c.get(url).status_code == 404
 
 
-def test_the_upload_step_refuses_a_bad_file_and_logs_it(web):
+def test_the_upload_step_refuses_a_bad_file_and_logs_it(web, data_dir):
     c = TestClient(web)
     start_taxpayer(c)
     rid = auth.load_session(c.cookies["sf_taxpayer"], "taxpayer").subject
@@ -144,6 +144,12 @@ def test_the_upload_step_refuses_a_bad_file_and_logs_it(web):
     assert r.status_code == 303
     docs = service.get_state(rid)["documents_in"]
     assert docs[-1]["media_type"] == "image/jpeg" and docs[-1]["path"].endswith(".enc")
+    # a second click on "Upload and continue" saves nothing and returns to the conversation
+    stored = sorted((Path(data_dir) / "uploads" / rid).iterdir())
+    again = c.post("/t/upload", data={"csrf_token": token(page), "interrupt_id": interrupt_id(page), "text": "done"}, files={"files": ("w2.jpg", JPEG, "image/jpeg")}, follow_redirects=False)
+    assert again.status_code == 303 and again.headers["location"] == "/t"
+    assert len(service.get_state(rid)["documents_in"]) == len(docs)
+    assert sorted((Path(data_dir) / "uploads" / rid).iterdir()) == stored
 
 
 def test_documents_must_come_from_an_upload_or_a_fixture(data_dir):

@@ -2,7 +2,24 @@
 {% set hide_key = true %}
 {% block title %}Your tax questions{% endblock %}
 {% block site %}SilverFile{% endblock %}
-{% block head %}{% if auto_refresh %}<script nonce="{{ csp_nonce }}">setTimeout(function () { location.reload(); }, 2000);</script>{% endif %}{% endblock %}
+{% block head %}{% if auto_refresh %}<script nonce="{{ csp_nonce }}">setTimeout(function () { location.reload(); }, 2000);</script>{% endif %}
+<script nonce="{{ csp_nonce }}">
+// An answer waits on a model call for a few seconds; send each form once.
+document.addEventListener("submit", function (e) {
+  var form = e.target;
+  if (!form.classList.contains("answer")) return;
+  if (form.dataset.sent) { e.preventDefault(); return; }
+  form.dataset.sent = "1";
+  // disabled after this tick, so the clicked button's name and value are still sent
+  setTimeout(function () {
+    form.querySelectorAll("button[type=submit]").forEach(function (b) { b.disabled = true; });
+    var main = form.querySelector("button.primary");
+    if (main) main.textContent = "Sending…";
+  }, 0);
+});
+// Back/forward restores a sent form; reload it so it carries the current question.
+window.addEventListener("pageshow", function (e) { if (e.persisted) location.reload(); });
+</script>{% endblock %}
 {% block brand %}<span class="brand">SilverFile <span>for Kushim taxpayers</span></span>{% endblock %}
 {% block nav %}
 <form method="post" action="/t/leave" class="inline"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="linkish" type="submit">Save and leave</button></form>
