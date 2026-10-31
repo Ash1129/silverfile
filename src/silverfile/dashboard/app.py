@@ -241,7 +241,10 @@ def create_app() -> FastAPI:
             if prefilled:
                 intake = service.fixture_intake(fixture)
         await run_in_threadpool(lambda: service.create_return(docs, intake, None, return_id=rid, fixture=fixture, actor=me))
-        await run_in_threadpool(service.run, rid, me)
+        # The first run only positions the graph at its first question or document step; it is part of creating
+        # the return, so a clerk (create_return, no advance_return) runs it as the system on their behalf.
+        starter = me if me.can("advance_return") else auth.system(f"start-by:{me.subject}")
+        await run_in_threadpool(service.run, rid, starter)
         code = auth.issue_access_code(rid) if intake is None else None
         if code:
             audit.record("access_code_issued", actor=me.label, return_id=rid)

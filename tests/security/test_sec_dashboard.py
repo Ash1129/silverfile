@@ -239,3 +239,17 @@ def test_unknown_and_malformed_return_ids_look_the_same(web):
     for rid in ("ret-" + "0" * 32, "../../etc/passwd", "ret-<script>"):
         r = c.get(f"/returns/{rid}")
         assert r.status_code == 404 and "<script>" not in r.text
+
+
+def test_a_clerk_can_start_a_return_and_gets_the_access_code(web):
+    """Starting a return is the clerk's job: the first graph step runs on their behalf even though a clerk
+    may not advance a return, and the one-time access code comes back on the created page."""
+    clerk = TestClient(web)
+    csrf = login(clerk, "cleo", "clerk")
+    r = clerk.post("/returns/new", data={"fixture": "case1_clean", "csrf_token": csrf})
+    assert r.status_code == 200, r.text[:300]
+    assert CODE_RE.search(r.text), "the access code is not on the created page"
+    rid = re.search(r"ret-[0-9a-f]{32}", r.text).group(0)
+    assert service.pending(rid)["type"] != "escalation"  # positioned at its first question, nothing refused
+    assert not [e for e in audit.recent(20, kind="access_denied") if e.get("return_id") == rid]
+    assert clerk.get(f"/returns/{rid}").status_code == 403  # the clerk still cannot open it
