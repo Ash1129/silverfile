@@ -38,4 +38,4 @@ Editing the downloaded PDF does not update SilverFile, calculations, audit logs 
 
 `tests/test_official_pdf.py` checks actual box mappings, canonical/widget consistency, appearance streams, status checkboxes, privacy, source destinations, missing amounts, dependent continuation and template/year guards. Visual checks render the four official pages for both demos and the appendix with Poppler.
 
-The full Windows Python 3.12 run after integration passed 613 tests. The two existing POSIX file-mode assertions in `tests/security/test_sec_keysetup.py` still fail on Windows and remain unchanged for Linux verification.
+After merging the latest master, the full Windows Python 3.13.15 Quick Start run passed 614 tests with one skip. Upstream PR #19 made the POSIX file-mode checks conditional on the platform; the POSIX-only test is skipped on Windows and its Linux assertion is retained. Linux behavior remains unverified. The earlier pre-merge Python 3.12 run passed 613 tests with the two then-existing Windows permission failures.

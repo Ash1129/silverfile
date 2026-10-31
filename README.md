@@ -108,7 +108,7 @@ DeepSeek uses the existing Anthropic SDK through its [Anthropic-compatible endpo
 ./.venv/bin/python run.py try
 ```
 
-Keep the terminal open. The command starts the local server and opens [http://localhost:8000](http://localhost:8000); open that address yourself if the browser does not appear. Log in as **`pat`**, password **`silverfile-demo-2025`**. Other demo users are `ada` (admin) and `cleo` (clerk). A fresh data directory is seeded with six demo returns, generated offline without API calls.
+Keep the terminal open. The command starts the local server and opens [http://localhost:8000](http://localhost:8000); open that address yourself if the browser does not appear. Log in as **`pat`**, password **`silverfile-demo-2025`**. Other demo users are `ada` (admin) and `cleo` (clerk). A fresh data directory is seeded with six demo returns. Seeding follows the configured mode and can make billed model calls when an API key is set; the browser may open before seeding finishes, so refresh after the terminal reports `Application startup complete`.
 
 Stop with **Ctrl+C** in the terminal. To restart later, enter the same repository folder and repeat the start command. Restart after changing `.env`.
 
