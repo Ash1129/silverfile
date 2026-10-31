@@ -3,8 +3,8 @@
 render_html(state) -> str   the Jinja2 template dashboard/templates/form.html,
                             standalone (inline CSS, one tiny inline script);
                             every amount carries a provenance popover.
-render_pdf(state)  -> bytes a reportlab mirror of the same lines in large type,
-                            with a provenance appendix.
+render_pdf(state)  -> bytes the supplied official 2025 IRS fillable form,
+                            marked draft and followed by a provenance appendix.
 
 Both work from a plain state dict; no web server is involved. SSNs are masked
 to the last four digits everywhere.
@@ -183,6 +183,11 @@ def render_html(state: dict[str, Any], dashboard_url: str | None = None, csp_non
 
 # ---------------------------------------------------------------- PDF
 def render_pdf(state: dict[str, Any]) -> bytes:
+    from .official import render_official_pdf
+    return render_official_pdf(state, _render_review_pdf(state, include_summary=False))
+
+
+def _render_review_pdf(state: dict[str, Any], *, include_summary: bool = True) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_RIGHT
     from reportlab.lib.pagesizes import letter
@@ -247,7 +252,9 @@ def render_pdf(state: dict[str, Any]) -> bytes:
             story += [heading, table]  # the long income table may split; its header row repeats
 
     # ---- appendix A: provenance per line
-    story += [PageBreak(), P("Appendix A — Provenance (every amount, how it was produced)", h2), P("Method is the tax_math tool that produced the figure, or 'direct user input'. Inputs are the exact arguments, with box references where a document was read. Sources are document ids or earlier lines.", small)]
+    if not include_summary:
+        story = []
+    story += ([PageBreak()] if story else []) + [P("Appendix A — Provenance (every amount, how it was produced)", h2), P("Method is the tax_math tool that produced the figure, or 'direct user input'. Inputs are the exact arguments, with box references where a document was read. Sources are document ids or earlier lines.", small)]
     for r in ctx["provenance_rows"]:
         block = [P(f"Line {r['line']} — {r['label']}: {r['display']}", h3)]
         if not r["has_prov"]:
@@ -299,6 +306,12 @@ def render_pdf(state: dict[str, Any]) -> bytes:
             res = e.get("resolution") or {}
             story.append(P(f"{e.get('kind')} ({e.get('status')}): {e.get('reason')}" + (f" — resolved by {e.get('resolved_by')}: {res.get('action')} {res.get('note') or ''}" if e.get("status") == "resolved" else ""), small))
 
+    if not include_summary:
+        story += [PageBreak(), P("Appendix C - Recorded facts and form coverage", h2), P("The preceding four pages use the supplied official 2025 IRS form. They are an editable, masked draft snapshot, not a filed return. Corrections in SilverFile trigger recalculation and review; editing the downloaded PDF does not update workflow state.", small), P("Only recorded facts and existing computed lines are populated. Address, signatures, direct-deposit details, refund/application elections and uncollected dependent attributes remain blank for the preparer. No filing or signing action is performed.", small), P("Presentation aliases: official line 1a repeats the W-2-only profile's line 1z; line 11b repeats 11a; official line 7a uses internal line 7. No amounts are recalculated by the renderer. Monetary fields retain the workflow's cents.", small), P(f"Return {ctx['return_id']} - status {status_label(ctx['status'])}", small)]
+        for label, value in ident:
+            story.append(P(f"{label}: {value}", small))
+        story.append(P("Dependents after the fourth appear in the record above; the official form's continuation checkbox identifies the additional people. Unknown facts are not represented as confirmed negative answers.", small))
+
     def on_page(canvas, doc):
         canvas.saveState()
         canvas.setFont("Helvetica-Bold", 9.5)
@@ -306,7 +319,7 @@ def render_pdf(state: dict[str, Any]) -> bytes:
         canvas.drawString(0.7 * inch, 0.55 * inch, BANNER)
         canvas.setFillColor(colors.black)
         canvas.setFont("Helvetica", 9.5)
-        canvas.drawRightString(letter[0] - 0.7 * inch, 0.35 * inch, f"Return {ctx['return_id']} · page {doc.page}")
+        canvas.drawRightString(letter[0] - 0.7 * inch, 0.35 * inch, f"Return {ctx['return_id']} · {'page' if include_summary else 'appendix page'} {doc.page}")
         canvas.restoreState()
 
     buf = io.BytesIO()

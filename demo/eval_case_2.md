@@ -52,4 +52,6 @@ Eligibility now reports MFJ with **three boxes on line 12d** (taxpayer 65+, taxp
 | 25d withholding | 4,000.00 | 1099-R 2,800 + SSA 1,200 |
 | 34 refund | 4,000.00 | |
 
+The dashboard's **Official 1040-SR draft PDF** places these amounts on the supplied official 2025 form, followed by provenance and review appendices. Its first four pages include the deduction chart; MFJ and the three age/blindness boxes are checked. Line 34 shows the 4,000.00 overpayment. Refund/application elections, bank details, address and signatures remain blank, and every official page is marked draft/not filed. **Review lines and sources** retains the HTML provenance cards; printed monetary line labels in the PDF link to its source appendix.
+
 The escalation record stays on the return with the resolution, who made it, when, and the note. Omitting the hub between workers, the recovery path is `eligibility → escalation → eligibility → computation → review → resolution_check → finalize`. The eval `spouse_died_mfj` pins these numbers; `tests/test_escalations.py` covers the pause, the patch, the halt path, and the box count. Blocking-review cases have an additional explicit resolve-event, save-explanation and Accept sequence; case 2 is a filing-status escalation and does not use Accept.
